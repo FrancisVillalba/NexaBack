@@ -1,0 +1,29 @@
+@NexaBack_HostAddress = https://localhost:7003
+
+### Disponibilidad de la aplicación
+GET {{NexaBack_HostAddress}}/health
+
+### Error 404 en formato Problem Details
+GET {{NexaBack_HostAddress}}/api/no-existe
+Accept: application/problem+json
+
+
+### Conexión a PostgreSQL (200 disponible / 503 no disponible)
+GET {{NexaBack_HostAddress}}/health/ready
+
+### Login (completar la contraseña localmente; no guardar credenciales reales en Git)
+POST {{NexaBack_HostAddress}}/api/usuarios/auth/login
+Content-Type: application/json
+
+{
+  "nombreUsuario": "fvillalba",
+  "password": "COMPLETAR_LOCALMENTE"
+}
+
+### Ejemplo de consulta protegida (reemplazar el token solo localmente)
+GET {{NexaBack_HostAddress}}/api/usuarios/perfiles?pagina=1&tamanoPagina=20
+Authorization: Bearer PEGAR_TOKEN_LOCALMENTE
+
+### Datos actuales de la sesión (cualquier usuario autenticado)
+GET {{NexaBack_HostAddress}}/api/usuarios/auth/me
+Authorization: Bearer PEGAR_TOKEN_LOCALMENTE

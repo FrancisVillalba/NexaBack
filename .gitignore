@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+TestResults/
+.env
+appsettings.Local.json
+artifacts/
+database/003_alta_administrador_fvillalba.sql
+*.backup
+*.dump
+*.bak
+*.pfx
+*.p12
+*.key
