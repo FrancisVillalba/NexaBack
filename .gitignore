@@ -1,16 +1,46 @@
+# Compilación y publicación de .NET
 **/bin/
 **/obj/
+artifacts/
+publish/
+
+# Archivos personales del IDE
 .vs/
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
+
+# Pruebas y cobertura
 TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Configuración privada (conservar archivos de ejemplo)
 .env
+.env.*
+!.env.example
+!.env.*.example
 appsettings.Local.json
-artifacts/
+appsettings.*.Local.json
+secrets.json
+.certificates/
+
+# Script personal de alta y copias de la base de datos
 database/003_alta_administrador_fvillalba.sql
 *.backup
 *.dump
 *.bak
+
+# Certificados y claves privadas
 *.pfx
 *.p12
 *.key
+
+# Logs y archivos temporales
+*.log
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
