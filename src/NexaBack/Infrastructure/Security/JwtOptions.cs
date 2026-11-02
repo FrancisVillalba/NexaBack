@@ -8,7 +8,7 @@ public sealed class JwtOptions
     [Required] public string Issuer { get; set; } = string.Empty;
     [Required] public string Audience { get; set; } = string.Empty;
     [Required] public string SigningKey { get; set; } = string.Empty;
-    [Range(1, 60)] public int ExpirationMinutes { get; set; } = 15;
+    [Range(1, 60)] public int ExpirationMinutes { get; set; } = 30;
 
     public static bool HasValidKey(JwtOptions options)
     {

@@ -29,6 +29,9 @@ public sealed class JwtTokenService(IOptions<JwtOptions> settings, TimeProvider 
             new("role", usuario.Perfil)
         };
         if (usuario.Documento is not null) claims.Add(new Claim("documento", usuario.Documento));
+        // Los permisos consultados por el backend quedan protegidos por la firma del JWT.
+        claims.AddRange(usuario.Accesos.Distinct(StringComparer.Ordinal).Select(codigo => new Claim("acceso", codigo)));
+        claims.Add(new Claim("permisosVersion", "1"));
 
         var key = new SymmetricSecurityKey(Convert.FromBase64String(options.SigningKey));
         var token = new JwtSecurityToken(

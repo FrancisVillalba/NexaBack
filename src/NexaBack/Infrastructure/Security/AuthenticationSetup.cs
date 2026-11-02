@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NexaBack.Repository.Usuarios.Usuarios;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using NexaBack.Services.Usuarios.Perfiles;
 
@@ -67,11 +66,12 @@ public static class AuthenticationSetup
                             return;
                         }
                         var accesos = context.HttpContext.RequestServices.GetRequiredService<IAccesoService>();
-                        // La base manda: no confiamos en permisos viejos o agregados al JWT.
-                        var identity = (ClaimsIdentity)principal.Identity!;
-                        foreach (var claim in identity.FindAll("acceso").ToArray()) identity.RemoveClaim(claim);
-                        foreach (var codigo in await accesos.EfectivosAsync(user.PerfilId, user.Perfil.Nombre, context.HttpContext.RequestAborted))
-                            identity.AddClaim(new Claim("acceso", codigo));
+                        // Se autorizan los claims firmados. Si cambia la asignación en la base,
+                        // se exige otro login para emitir un token con los permisos vigentes.
+                        var vigentes = await accesos.EfectivosAsync(user.PerfilId, user.Perfil.Nombre, context.HttpContext.RequestAborted);
+                        if (principal.FindFirst("permisosVersion")?.Value != "1"
+                            || !vigentes.ToHashSet(StringComparer.Ordinal).SetEquals(principal.FindAll("acceso").Select(x => x.Value)))
+                            context.Fail("Los permisos cambiaron. Volvé a iniciar sesión.");
                     }
                 };
             });

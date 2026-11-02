@@ -28,7 +28,9 @@ public sealed class AuthController(IUsuarioService usuarios) : ControllerBase
     {
         Response.Headers.CacheControl = "no-store";
         if (!int.TryParse(User.FindFirst("sub")?.Value, out var id) || id <= 0) return Unauthorized();
-        return Ok(await usuarios.ObtenerSesionAsync(id, cancellationToken));
+        var usuario = await usuarios.ObtenerSesionAsync(id, cancellationToken);
+        // La sesión devuelve los mismos permisos del token que validó el middleware.
+        return Ok(usuario with { Accesos = User.FindAll("acceso").Select(x => x.Value).Distinct().ToArray() });
     }
 
     [HttpPost("login")]

@@ -19,8 +19,9 @@ public sealed class AccesoRepository(UsuariosDbContext context) : IAccesoReposit
 
     public async Task<string[]> EfectivosAsync(int perfilId, bool administrador, CancellationToken ct)
     {
-        if (administrador) return AccessCatalog.Definitions.Select(x => x.Codigo).ToArray();
-        // No se usan permisos viejos del JWT: se consulta la asignación vigente en PostgreSQL.
+        // Administrador obtiene el catálogo activo desde la base, sin listas de permisos en el front.
+        if (administrador) return await context.Accesos.AsNoTracking().Where(x => x.Activo)
+            .Select(x => x.Codigo).OrderBy(x => x).ToArrayAsync(ct);
         return await context.PerfilesAccesos.AsNoTracking()
             .Where(x => x.PerfilId == perfilId && x.Acceso.Activo && x.Perfil.Activo)
             .Where(x => x.Acceso.Modulo != "personas" && x.Acceso.Modulo != "usuarios"
