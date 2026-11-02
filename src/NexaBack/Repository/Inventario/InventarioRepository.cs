@@ -85,7 +85,9 @@ public sealed class InventarioRepository(UsuariosDbContext context) : IInventari
             if (!producto.Activo) throw new BusinessException("El producto está inactivo. Reactivalo antes de registrar movimientos.");
             var origen = await context.Depositos.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
             if (origen is null || !origen.Activo) throw new BusinessException("El depósito de origen no existe o está inactivo.");
-            if (request.DepositoDestinoId.HasValue && !await context.Depositos.AnyAsync(x => x.Id == request.DepositoDestinoId && x.Activo, ct))
+            var depositoDestino = request.DepositoDestinoId.HasValue
+                ? await context.Depositos.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.DepositoDestinoId, ct) : null;
+            if (request.DepositoDestinoId.HasValue && (depositoDestino is null || !depositoDestino.Activo))
                 throw new BusinessException("El depósito de destino no existe o está inactivo.");
             var saldo = await ObtenerSaldoAsync(request.ProductoId, request.DepositoId, ct);
             Guid? versionActual = context.Entry(saldo).State == EntityState.Added ? null : saldo.Version;
@@ -112,6 +114,14 @@ public sealed class InventarioRepository(UsuariosDbContext context) : IInventari
             // que se registra su primer movimiento, y protege su estado activo.
             context.Productos.Attach(producto);
             producto.Version = Guid.NewGuid();
+            // La versión compartida protege también frente a una desactivación simultánea del depósito.
+            context.Depositos.Attach(origen);
+            origen.Version = Guid.NewGuid();
+            if (depositoDestino is not null)
+            {
+                context.Depositos.Attach(depositoDestino);
+                depositoDestino.Version = Guid.NewGuid();
+            }
             await context.SaveChangesAsync(ct);
             var result = await context.MovimientosInventario.AsNoTracking().Where(x => x.Id == movimiento.Id).Select(Proyeccion).SingleAsync(ct);
             await transaction.CommitAsync(ct);

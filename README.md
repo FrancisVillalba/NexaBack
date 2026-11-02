@@ -157,3 +157,9 @@ Los módulos comerciales del frontend aún usan datos locales. La autenticación
 
 El perfil https de NexaBack y el perfil IIS Express usan los mismos puertos locales: HTTPS 44388 y HTTP 56953. Ejecutar uno de esos perfiles, no ambos al mismo tiempo. El frontend usa HTTPS 44388 por defecto. El perfil http alternativo conserva 5261 y requiere configurar NEXA_API_URL explícitamente.
 
+
+## ABM de depósitos
+
+Administración > Depósitos permite crear, editar, activar y desactivar con auditoría. Ejecutar manualmente `src/NexaBack/Infrastructure/Persistence/Sql/004_Depositos.sql` después de tener Inventario instalado; agrega Descripcion, Version y los permisos depositos.ver/crear/editar/estado. No crea depósitos de ejemplo. Reiniciar la API e iniciar sesión nuevamente.
+
+El nombre es único sin distinguir mayúsculas ni espacios extremos. No se desactiva un depósito con existencias; la comprobación y el cambio de estado son transaccionales. Los movimientos también actualizan su versión para proteger operaciones simultáneas. La administración de depósitos es exclusiva de Administrador.

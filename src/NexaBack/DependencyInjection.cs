@@ -34,6 +34,8 @@ public static class DependencyInjection
         services.AddScoped<IProductoService, ProductoService>();
         services.AddScoped<IInventarioRepository, InventarioRepository>();
         services.AddScoped<IInventarioService, InventarioService>();
+        services.AddScoped<IDepositoRepository, DepositoRepository>();
+        services.AddScoped<IDepositoService, DepositoService>();
         return services;
     }
 }
