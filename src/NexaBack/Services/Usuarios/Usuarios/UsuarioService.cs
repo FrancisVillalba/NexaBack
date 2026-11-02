@@ -7,6 +7,7 @@ using NexaBack.Common;
 using NexaBack.Infrastructure.Data.Dtos.Usuarios;
 using NexaBack.Infrastructure.Security;
 using System.Security.Cryptography;
+using NexaBack.Services.Usuarios.Perfiles;
 
 namespace NexaBack.Services.Usuarios.Usuarios;
 
@@ -14,7 +15,7 @@ public sealed class UsuarioService(IUsuarioRepository repository,
     IPersonaRepository personas,
     IPerfilRepository perfiles,
     IPasswordHasher<Usuario> passwordHasher,
-    ITokenService tokens) : IUsuarioService
+    ITokenService tokens, IAccesoService accesos) : IUsuarioService
 {
     private static readonly Usuario DummyUser = CreateDummyUser();
 
@@ -55,6 +56,7 @@ public sealed class UsuarioService(IUsuarioRepository repository,
             var newHash = passwordHasher.HashPassword(user, request.Password);
             if (!await repository.ActualizarPasswordHashAsync(user.Id, user.PasswordHash, newHash, cancellationToken))
                 throw new BusinessException("Volvé a iniciar sesión.", 401);
+            user.PasswordHash = newHash;
         }
 
         return tokens.Crear(new UsuarioSesionDto(user.Id,
@@ -63,7 +65,7 @@ public sealed class UsuarioService(IUsuarioRepository repository,
                                                  user.Persona.Apellidos,
                                                  user.Persona.Documento,
                                                  user.PerfilId,
-                                                 user.Perfil.Nombre));
+                                                 user.Perfil.Nombre, await accesos.EfectivosAsync(user.PerfilId, user.Perfil.Nombre, cancellationToken)), CredentialVersion.FromHash(user.PasswordHash));
     }
 
     public async Task<UsuarioSesionDto> ObtenerSesionAsync(int id, CancellationToken cancellationToken = default)
@@ -72,7 +74,8 @@ public sealed class UsuarioService(IUsuarioRepository repository,
         if (user is null || !user.Activo || !user.Persona.Activo || !user.Perfil.Activo)
             throw new BusinessException("La sesión dejó de ser válida.", 401);
         return new UsuarioSesionDto(user.Id, user.NombreUsuario, user.Persona.Nombres,
-            user.Persona.Apellidos, user.Persona.Documento, user.PerfilId, user.Perfil.Nombre);
+            user.Persona.Apellidos, user.Persona.Documento, user.PerfilId, user.Perfil.Nombre,
+            await accesos.EfectivosAsync(user.PerfilId, user.Perfil.Nombre, cancellationToken));
     }
 
     public async Task<IReadOnlyList<UsuarioDto>> ListarAsync(
@@ -117,6 +120,33 @@ public sealed class UsuarioService(IUsuarioRepository repository,
         entity.PasswordHash = passwordHasher.HashPassword(entity, request.Password);
         await repository.AgregarAsync(entity, cancellationToken);
         return Map(entity);
+    }
+
+    public async Task<UsuarioDto> ActualizarAsync(int id, ActualizarUsuarioRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var nombre = Validation.Required(request.NombreUsuario, "Nombre de usuario", 100).ToLowerInvariant();
+        if (nombre.Any(char.IsWhiteSpace))
+            throw new BusinessException("El nombre de usuario no puede contener espacios.");
+        if (await repository.ExisteNombreUsuarioAsync(nombre, cancellationToken, excluirId: id))
+            throw new BusinessException("Ese nombre de usuario ya existe.", 409);
+        return Map(await repository.ActualizarAsync(id, nombre, request.PerfilId, cancellationToken));
+    }
+
+    public Task CambiarEstadoAsync(int id, bool activo, CancellationToken cancellationToken = default)
+        => repository.CambiarEstadoAsync(id, activo, cancellationToken);
+
+    public async Task CambiarPasswordAsync(int id, CambiarPasswordUsuarioRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length is < 12 or > 128)
+            throw new BusinessException("La contraseña debe tener entre 12 y 128 caracteres.");
+        var usuario = await repository.ObtenerAsync(id, cancellationToken)
+            ?? throw new BusinessException("Usuario no encontrado.", 404);
+        var hash = passwordHasher.HashPassword(usuario, request.Password);
+        // Se compara el hash anterior para no pisar otro cambio de contraseña concurrente.
+        if (!await repository.ActualizarPasswordHashAsync(id, usuario.PasswordHash, hash, cancellationToken))
+            throw new BusinessException("La cuenta cambió durante la operación. Actualizá y volvé a intentar.", 409);
     }
 
     private static UsuarioDto Map(Usuario x) => new(x.Id, x.NombreUsuario, x.PersonaId, x.PerfilId, x.Activo, x.CreadoEn);

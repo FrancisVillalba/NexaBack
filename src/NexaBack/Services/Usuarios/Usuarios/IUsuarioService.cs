@@ -9,4 +9,7 @@ public interface IUsuarioService
     Task<IReadOnlyList<UsuarioDto>> ListarAsync(int pagina = 1, int tamanoPagina = 20, CancellationToken cancellationToken = default);
     Task<UsuarioDto> ObtenerAsync(int id, CancellationToken cancellationToken = default);
     Task<UsuarioDto> CrearAsync(CrearUsuarioRequest request, CancellationToken cancellationToken = default);
+    Task<UsuarioDto> ActualizarAsync(int id, ActualizarUsuarioRequest request, CancellationToken cancellationToken = default);
+    Task CambiarEstadoAsync(int id, bool activo, CancellationToken cancellationToken = default);
+    Task CambiarPasswordAsync(int id, CambiarPasswordUsuarioRequest request, CancellationToken cancellationToken = default);
 }

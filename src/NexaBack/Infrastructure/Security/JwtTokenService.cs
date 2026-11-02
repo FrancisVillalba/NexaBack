@@ -10,7 +10,7 @@ namespace NexaBack.Infrastructure.Security;
 
 public sealed class JwtTokenService(IOptions<JwtOptions> settings, TimeProvider clock) : ITokenService
 {
-    public LoginResponse Crear(UsuarioSesionDto usuario)
+    public LoginResponse Crear(UsuarioSesionDto usuario, string versionCredencial)
     {
         var options = settings.Value;
         var now = clock.GetUtcNow();
@@ -21,6 +21,7 @@ public sealed class JwtTokenService(IOptions<JwtOptions> settings, TimeProvider 
             new(JwtRegisteredClaimNames.Jti, Convert.ToHexString(RandomNumberGenerator.GetBytes(16))),
             new("usuarioId", usuario.UsuarioId.ToString(CultureInfo.InvariantCulture), ClaimValueTypes.Integer32),
             new("nombreUsuario", usuario.NombreUsuario),
+            new("credencial", versionCredencial),
             new("nombre", usuario.Nombre),
             new("apellido", usuario.Apellido),
             new("perfilId", usuario.PerfilId.ToString(CultureInfo.InvariantCulture), ClaimValueTypes.Integer32),

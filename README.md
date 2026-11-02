@@ -125,6 +125,17 @@ Para probar:
 
 El login es público; las operaciones de administración llevan candado y requieren Administrador. Swagger no persiste la autorización tras recargar. No se incluyen contraseñas ni tokens reales en ejemplos ni en el documento. La configuración está en Infrastructure/Documentation/SwaggerSetup.cs.
 
+## ABM de Personas
+
+Personas admite búsqueda (`buscar`), filtro opcional `activo`, edición con `PUT /api/usuarios/personas/{id}`
+y baja/reactivación con `PATCH /api/usuarios/personas/{id}/estado` y cuerpo `{ "activo": false }` o `true`.
+La edición usa las mismas validaciones del alta y excluye el Id actual al comprobar documentos duplicados.
+Las operaciones requieren Administrador. No hay eliminación física ni cambios en el esquema de NexaDB.
+
+La baja protege al último administrador activo dentro de una transacción Serializable. Las solicitudes
+concurrentes que entren en conflicto reciben 409 para que el usuario actualice y reintente.
+Una persona inactiva invalida el acceso de su cuenta mediante la validación JWT existente.
+
 ## Frontend conectado
 
 El frontend ya consume POST /api/usuarios/auth/login y GET /api/usuarios/auth/me. Este último devuelve UsuarioSesionDto y permite restaurar la sesión para cualquier perfil autenticado; no requiere Administrador. La validación del JWT comprueba vigencia del usuario, persona y perfil antes de devolver los datos.

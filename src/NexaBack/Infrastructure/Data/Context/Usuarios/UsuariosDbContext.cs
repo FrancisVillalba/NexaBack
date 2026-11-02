@@ -10,6 +10,8 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
     public DbSet<Persona> Personas => Set<Persona>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<Perfil> Perfiles => Set<Perfil>();
+    public DbSet<Acceso> Accesos => Set<Acceso>();
+    public DbSet<PerfilAcceso> PerfilesAccesos => Set<PerfilAcceso>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -18,5 +20,7 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
         modelBuilder.ApplyConfiguration(new PersonaConfiguration());
         modelBuilder.ApplyConfiguration(new UsuarioConfiguration());
         modelBuilder.ApplyConfiguration(new PerfilConfiguration());
+        modelBuilder.ApplyConfiguration(new AccesoConfiguration());
+        modelBuilder.ApplyConfiguration(new PerfilAccesoConfiguration());
     }
 }

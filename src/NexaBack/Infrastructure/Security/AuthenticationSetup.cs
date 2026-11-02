@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NexaBack.Repository.Usuarios.Usuarios;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using NexaBack.Services.Usuarios.Perfiles;
 
 namespace NexaBack.Infrastructure.Security;
 
@@ -54,16 +57,30 @@ public static class AuthenticationSetup
                         }
                         var repository = context.HttpContext.RequestServices.GetRequiredService<IUsuarioRepository>();
                         var user = await repository.ObtenerConRelacionesAsync(id, context.HttpContext.RequestAborted);
-                        // Una baja o cambio de perfil invalida el acceso aun antes del vencimiento del token.
                         if (user is null || !user.Activo || !user.Persona.Activo || !user.Perfil.Activo
                             || principal.FindFirst("perfilId")?.Value != user.PerfilId.ToString(CultureInfo.InvariantCulture)
                             || principal.FindFirst("role")?.Value != user.Perfil.Nombre
-                            || principal.FindFirst("nombreUsuario")?.Value != user.NombreUsuario)
+                            || principal.FindFirst("nombreUsuario")?.Value != user.NombreUsuario
+                            || principal.FindFirst("credencial")?.Value != CredentialVersion.FromHash(user.PasswordHash))
+                        {
                             context.Fail("Sesión inválida.");
+                            return;
+                        }
+                        var accesos = context.HttpContext.RequestServices.GetRequiredService<IAccesoService>();
+                        // La base manda: no confiamos en permisos viejos o agregados al JWT.
+                        var identity = (ClaimsIdentity)principal.Identity!;
+                        foreach (var claim in identity.FindAll("acceso").ToArray()) identity.RemoveClaim(claim);
+                        foreach (var codigo in await accesos.EfectivosAsync(user.PerfilId, user.Perfil.Nombre, context.HttpContext.RequestAborted))
+                            identity.AddClaim(new Claim("acceso", codigo));
                     }
                 };
             });
-        services.AddAuthorization();
+        services.AddAuthorization(options =>
+        {
+            foreach (var access in AccessCatalog.Definitions)
+                options.AddPolicy("acceso:" + access.Codigo, policy => policy.RequireAuthenticatedUser().AddRequirements(new AccessRequirement(access.Codigo)));
+        });
+        services.AddSingleton<IAuthorizationHandler, AccessHandler>();
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;

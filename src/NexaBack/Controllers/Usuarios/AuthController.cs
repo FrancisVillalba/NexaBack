@@ -10,6 +10,16 @@ namespace NexaBack.Controllers.Usuarios;
 [Route("api/usuarios/auth")]
 public sealed class AuthController(IUsuarioService usuarios) : ControllerBase
 {
+    // Permite verificar una política concreta sin emitir otro token ni exponer datos ajenos.
+    [HttpGet("accesos/{codigo}")]
+    [Authorize]
+    public async Task<IActionResult> ComprobarAcceso(string codigo, [FromServices] IAuthorizationService authorization)
+    {
+        if (!NexaBack.Infrastructure.Security.AccessCatalog.Definitions.Any(x => x.Codigo == codigo)) return NotFound();
+        var result = await authorization.AuthorizeAsync(User, "acceso:" + codigo);
+        return result.Succeeded ? NoContent() : Forbid();
+    }
+
     [HttpGet("me")]
     [Authorize]
     [ProducesResponseType<UsuarioSesionDto>(StatusCodes.Status200OK)]

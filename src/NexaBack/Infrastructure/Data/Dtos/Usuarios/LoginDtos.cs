@@ -8,7 +8,7 @@ public sealed record LoginRequest(
 
 public sealed record UsuarioSesionDto(
     int UsuarioId, string NombreUsuario, string Nombre, string Apellido,
-    string? Documento, int PerfilId, string Perfil);
+    string? Documento, int PerfilId, string Perfil, string[] Accesos);
 
 public sealed record LoginResponse(
     string Token, string TipoToken, DateTimeOffset ExpiraEn, UsuarioSesionDto Usuario);
