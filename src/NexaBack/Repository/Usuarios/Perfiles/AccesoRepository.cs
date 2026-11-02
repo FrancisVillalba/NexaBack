@@ -62,6 +62,12 @@ public sealed class AccesoRepository(UsuariosDbContext context) : IAccesoReposit
             var retained = previous.Select(x => x.AccesoId).ToHashSet();
             context.PerfilesAccesos.AddRange(accesos.Where(x => !retained.Contains(x.Id))
                 .Select(x => new PerfilAcceso { PerfilId = id, AccesoId = x.Id }));
+            if (previous.Any(x => !selected.Contains(x.AccesoId)) || accesos.Any(x => !retained.Contains(x.Id)))
+            {
+                // Quitar una asignación elimina su fila; el perfil conserva quién cambió sus permisos.
+                var perfil = await context.Perfiles.SingleAsync(x => x.Id == id, ct);
+                perfil.ModificadoEn = DateTime.UtcNow;
+            }
             await context.SaveChangesAsync(ct);
             var result = await ObtenerAsync(id, ct);
             await transaction.CommitAsync(ct);

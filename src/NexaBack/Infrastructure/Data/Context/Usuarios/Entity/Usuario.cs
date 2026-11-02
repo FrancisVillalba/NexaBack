@@ -1,8 +1,9 @@
 using System.Text.Json.Serialization;
+using NexaBack.Infrastructure.Persistence;
 
 namespace NexaBack.Infrastructure.Data.Context.Usuarios.Entity;
 
-public sealed class Usuario
+public sealed class Usuario : IEntidadAuditable
 {
     public int Id { get; set; }
     public required string NombreUsuario { get; set; }
@@ -11,6 +12,9 @@ public sealed class Usuario
     public required string PasswordHash { get; set; }
     public bool Activo { get; set; } = true;
     public DateTime CreadoEn { get; set; } = DateTime.UtcNow;
+    public int? CreadoPor { get; set; }
+    public DateTime? ModificadoEn { get; set; }
+    public int? ModificadoPor { get; set; }
     public int PersonaId { get; set; }
     public Persona Persona { get; set; } = null!;
     public int PerfilId { get; set; }

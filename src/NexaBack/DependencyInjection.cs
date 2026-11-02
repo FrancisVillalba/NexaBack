@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using NexaBack.Services.Usuarios.Personas;
 using NexaBack.Services.Usuarios.Perfiles;
 using NexaBack.Services.Usuarios.Usuarios;
+using NexaBack.Infrastructure.Persistence;
 
 namespace NexaBack;
 
@@ -14,6 +15,8 @@ public static class DependencyInjection
     public static IServiceCollection AddBusinessServices(this IServiceCollection services)
     {
         // Scoped: todos los repositorios de una solicitud comparten el mismo DbContext.
+        services.AddHttpContextAccessor();
+        services.AddScoped<IUsuarioAuditoria, UsuarioAuditoria>();
         services.AddScoped<IPersonaRepository, PersonaRepository>();
         services.AddScoped<IPerfilRepository, PerfilRepository>();
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();

@@ -1,6 +1,8 @@
+using NexaBack.Infrastructure.Persistence;
+
 namespace NexaBack.Infrastructure.Data.Context.Usuarios.Entity;
 
-public sealed class Persona
+public sealed class Persona : IEntidadAuditable
 {
     public int Id { get; set; }
     public required string Nombres { get; set; }
@@ -11,5 +13,8 @@ public sealed class Persona
     public string? Direccion { get; set; }
     public bool Activo { get; set; } = true;
     public DateTime CreadoEn { get; set; } = DateTime.UtcNow;
+    public int? CreadoPor { get; set; }
+    public DateTime? ModificadoEn { get; set; }
+    public int? ModificadoPor { get; set; }
     public Usuario? Usuario { get; set; }
 }

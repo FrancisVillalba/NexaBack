@@ -26,8 +26,15 @@ public sealed class UsuarioRepository(UsuariosDbContext context) : IUsuarioRepos
             .SingleOrDefaultAsync(x => x.NombreUsuario == nombre, cancellationToken);
 
     public async Task<bool> ActualizarPasswordHashAsync(int id, string hashAnterior, string hashNuevo, CancellationToken cancellationToken = default)
-        => await context.Usuarios.Where(x => x.Id == id && x.PasswordHash == hashAnterior)
-            .ExecuteUpdateAsync(update => update.SetProperty(x => x.PasswordHash, hashNuevo), cancellationToken) == 1;
+    {
+        // ExecuteUpdate no pasa por SaveChanges: incluir la auditoría en la misma escritura atómica.
+        // Durante el login se actualiza el hash del usuario cuya contraseña ya se verificó.
+        var usuarioId = context.UsuarioAuditoriaId ?? id;
+        var ahora = DateTime.UtcNow;
+        return await context.Usuarios.Where(x => x.Id == id && x.PasswordHash == hashAnterior)
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.PasswordHash, hashNuevo)
+                .SetProperty(x => x.ModificadoEn, ahora).SetProperty(x => x.ModificadoPor, usuarioId), cancellationToken) == 1;
+    }
 
     public Task<bool> ExisteNombreUsuarioAsync(string value, CancellationToken cancellationToken = default, int? excluirId = null)
         => context.Usuarios.AnyAsync(x => x.NombreUsuario == value && x.Id != excluirId, cancellationToken);
