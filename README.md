@@ -1,6 +1,6 @@
 # NEXA — Backend
 
-API en C# y ASP.NET Core 10. Base inicial: incluye configuración de PostgreSQL con Entity Framework Core; incluye login JWT y administración básica de personas, perfiles y usuarios; todavía no incluye los módulos comerciales.
+API en C# y ASP.NET Core 10 con PostgreSQL y Entity Framework Core. Incluye login JWT, administración de personas, usuarios, perfiles y permisos, ABM de productos y existencias y movimientos de inventario.
 
 ## Visual Studio
 
@@ -27,18 +27,29 @@ Organización por funcionalidad: cada módulo tendrá sus controladores, contrat
 
 Se incluyen controladores con `[ApiController]`, referencias anulables, inyección de dependencias y Problem Details para errores. `/health` comprueba disponibilidad de la aplicación. `/health/ready` verifica la conexión a PostgreSQL y devuelve 200 o 503 sin modificar tablas. No se habilita CORS abierto.
 
-## Integración pendiente
+## Integración con el frontend
 
-El frontend sigue usando su host de demostración para login y usuarios. Esta API no lo reemplaza todavía. El login JWT del backend está implementado; falta adaptar el frontend para consumirlo y enviar Authorization: Bearer. No se copiaron usuarios ni contraseñas de demostración.
+El frontend consume las API con Authorization: Bearer. Los permisos se consultan en PostgreSQL y se incluyen en el JWT. Si cambian, se requiere iniciar sesión nuevamente. La sesión vence a los 30 minutos.
 
-Base elegida: PostgreSQL, NexaDB. La administración de personas, usuarios y perfiles usa PostgreSQL y exige Administrador. Falta integrar el frontend y desarrollar los módulos comerciales.
+Productos e Inventario consultan la base real. Compras, ventas, presupuestos, clientes, proveedores, inicio y reportes todavía usan datos locales de demostración; sus operaciones no modifican el stock real.
 
-No guardar secretos en el repositorio. Usar User Secrets para desarrollo y configuración segura del entorno para despliegue.
+## Inventario: preparación manual
 
+Revisar y ejecutar en NexaDB el script `src/NexaBack/Infrastructure/Persistence/Sql/003_Inventario.sql`. Requiere la tabla `catalogo.productos`. El código no ejecuta este script al arrancar.
+
+El script crea depósitos, existencias y movimientos con auditoría. Incluye Casa central y Depósito Norte; revisar los nombres antes de ejecutarlo. No carga cantidades de ejemplo.
+
+- Crear productos desde el ABM de Productos. Su existencia inicial se consulta como cero.
+- En Inventario, elegir un depósito y registrar una Entrada para cargar el saldo inicial.
+- Ajuste establece el saldo final deseado; Salida descuenta; Transferencia descuenta del origen y suma al destino de forma atómica.
+- Movimientos de stock muestra el historial inmutable, saldos y usuario responsable.
+- Permisos: `inventario.ver` para consulta; `movimientos.ver` para historial; `movimientos.crear` y acceso a Inventario para registrar. No se amplían permisos de Operador automáticamente.
+- No se permiten saldos negativos, y solo metro y kilo admiten fracciones (hasta tres decimales). La unidad no se cambia después del primer movimiento.
+- Los formularios envían versiones y un identificador de operación para rechazar saldos desactualizados y evitar registros duplicados al reintentar.
 
 ## PostgreSQL y EF Core
 
-`Infrastructure/Data/Context/Usuarios/UsuariosDbContext.cs` representa la sesión de acceso a datos. Este contexto contiene Persona, Usuario y Perfil y aplica solamente sus configuraciones. El arranque no crea tablas ni modifica la base.
+`Infrastructure/Data/Context/Usuarios/UsuariosDbContext.cs` representa la sesión de acceso a datos. Este contexto comparte las entidades de usuarios, productos e inventario, con sus configuraciones y auditoría centralizada. El arranque no crea tablas ni modifica la base.
 
 La conexión se conserva en Secretos de usuario y en appsettings.Local.json para el desarrollo local con Visual Studio. En Visual Studio: clic derecho en NexaBack → Administrar secretos de usuario. Clave: `ConnectionStrings:NexaDB`. Usar el nombre exacto `NexaDB`, host localhost y puerto 5432. No copiar contraseñas a appsettings.json. Los perfiles locales usan Development y cargan esos secretos automáticamente; en producción usar `ConnectionStrings__NexaDB` en la configuración segura del entorno.
 

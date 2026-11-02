@@ -9,6 +9,8 @@ using NexaBack.Services.Usuarios.Usuarios;
 using NexaBack.Infrastructure.Persistence;
 using NexaBack.Repository.Productos;
 using NexaBack.Services.Productos;
+using NexaBack.Repository.Inventario;
+using NexaBack.Services.Inventario;
 
 namespace NexaBack;
 
@@ -30,6 +32,8 @@ public static class DependencyInjection
         services.AddScoped<IAccesoService, AccesoService>();
         services.AddScoped<IProductoRepository, ProductoRepository>();
         services.AddScoped<IProductoService, ProductoService>();
+        services.AddScoped<IInventarioRepository, InventarioRepository>();
+        services.AddScoped<IInventarioService, InventarioService>();
         return services;
     }
 }

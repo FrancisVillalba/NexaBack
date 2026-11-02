@@ -40,6 +40,9 @@ public sealed class ProductoRepository(UsuariosDbContext context) : IProductoRep
         await GuardarCambiosAsync(ct);
     }
 
+    public Task<bool> TieneMovimientosAsync(int productoId, CancellationToken ct)
+        => context.MovimientosInventario.AnyAsync(x => x.ProductoId == productoId, ct);
+
     public async Task GuardarCambiosAsync(CancellationToken ct)
     {
         try { await PersistenceErrors.SaveAsync(context, ct); }

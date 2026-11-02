@@ -36,6 +36,8 @@ public sealed class ProductoService(IProductoRepository repository) : IProductoS
         var producto = await ObtenerEntidadAsync(id, true, ct);
         ValidarVersion(producto, request.Version);
         await ValidarDuplicadosAsync(datos, id, ct);
+        if (producto.UnidadMedida != datos.UnidadMedida && await repository.TieneMovimientosAsync(id, ct))
+            throw new BusinessException("No se puede cambiar la unidad de medida de un producto que ya tiene movimientos de stock.", 409);
         Aplicar(producto, datos);
         producto.Version = Guid.NewGuid();
         await repository.GuardarCambiosAsync(ct);

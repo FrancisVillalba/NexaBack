@@ -4,6 +4,8 @@ using NexaBack.Infrastructure.Data.Context.Usuarios.Configurations;
 using NexaBack.Infrastructure.Persistence;
 using NexaBack.Infrastructure.Data.Context.Productos.Entity;
 using NexaBack.Infrastructure.Data.Context.Productos.Configurations;
+using NexaBack.Infrastructure.Data.Context.Inventario.Entity;
+using NexaBack.Infrastructure.Data.Context.Inventario.Configurations;
 
 namespace NexaBack.Infrastructure.Data.Context.Usuarios;
 
@@ -16,6 +18,9 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
     public DbSet<Acceso> Accesos => Set<Acceso>();
     public DbSet<PerfilAcceso> PerfilesAccesos => Set<PerfilAcceso>();
     public DbSet<Producto> Productos => Set<Producto>();
+    public DbSet<Deposito> Depositos => Set<Deposito>();
+    public DbSet<Existencia> Existencias => Set<Existencia>();
+    public DbSet<MovimientoInventario> MovimientosInventario => Set<MovimientoInventario>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +32,9 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
         modelBuilder.ApplyConfiguration(new AccesoConfiguration());
         modelBuilder.ApplyConfiguration(new PerfilAccesoConfiguration());
         modelBuilder.ApplyConfiguration(new ProductoConfiguration());
+        modelBuilder.ApplyConfiguration(new DepositoConfiguration());
+        modelBuilder.ApplyConfiguration(new ExistenciaConfiguration());
+        modelBuilder.ApplyConfiguration(new MovimientoInventarioConfiguration());
         foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(x => typeof(IEntidadAuditable).IsAssignableFrom(x.ClrType)).ToArray())
         {
             var builder = modelBuilder.Entity(entity.ClrType);
