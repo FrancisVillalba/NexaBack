@@ -2,10 +2,12 @@ using NexaBack.Infrastructure.Data.Context.Usuarios.Entity;
 using Microsoft.EntityFrameworkCore;
 using NexaBack.Infrastructure.Data.Context.Usuarios.Configurations;
 using NexaBack.Infrastructure.Persistence;
+using NexaBack.Infrastructure.Data.Context.Productos.Entity;
+using NexaBack.Infrastructure.Data.Context.Productos.Configurations;
 
 namespace NexaBack.Infrastructure.Data.Context.Usuarios;
 
-/// <summary>Unidad de trabajo para las tablas del esquema usuarios de NexaDB.</summary>
+/// <summary>Unidad de trabajo compartida: usuarios y catálogo usan la misma auditoría y transacción.</summary>
 public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> options, IUsuarioAuditoria usuarioAuditoria) : DbContext(options)
 {
     public DbSet<Persona> Personas => Set<Persona>();
@@ -13,6 +15,7 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
     public DbSet<Perfil> Perfiles => Set<Perfil>();
     public DbSet<Acceso> Accesos => Set<Acceso>();
     public DbSet<PerfilAcceso> PerfilesAccesos => Set<PerfilAcceso>();
+    public DbSet<Producto> Productos => Set<Producto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,6 +26,7 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
         modelBuilder.ApplyConfiguration(new PerfilConfiguration());
         modelBuilder.ApplyConfiguration(new AccesoConfiguration());
         modelBuilder.ApplyConfiguration(new PerfilAccesoConfiguration());
+        modelBuilder.ApplyConfiguration(new ProductoConfiguration());
         foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(x => typeof(IEntidadAuditable).IsAssignableFrom(x.ClrType)).ToArray())
         {
             var builder = modelBuilder.Entity(entity.ClrType);

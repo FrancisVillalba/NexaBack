@@ -24,7 +24,7 @@ public static class AccessCatalog
                 "restablecer" => "Restablecer datos", _ => action
             }));
         }
-        Add("inicio", "ver"); Add("productos", "ver", "crear", "editar"); Add("inventario", "ver");
+        Add("inicio", "ver"); Add("productos", "ver", "crear", "editar", "estado"); Add("inventario", "ver");
         Add("movimientos", "ver", "crear"); Add("compras", "ver", "crear", "recibir");
         Add("ventas", "ver", "crear", "anular", "cobrar"); Add("presupuestos", "ver", "crear", "eliminar", "convertir");
         Add("clientes", "ver", "crear", "editar", "cuenta_corriente"); Add("proveedores", "ver", "crear", "editar");

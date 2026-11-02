@@ -7,6 +7,8 @@ using NexaBack.Services.Usuarios.Personas;
 using NexaBack.Services.Usuarios.Perfiles;
 using NexaBack.Services.Usuarios.Usuarios;
 using NexaBack.Infrastructure.Persistence;
+using NexaBack.Repository.Productos;
+using NexaBack.Services.Productos;
 
 namespace NexaBack;
 
@@ -26,6 +28,8 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
         services.AddScoped<IAccesoRepository, AccesoRepository>();
         services.AddScoped<IAccesoService, AccesoService>();
+        services.AddScoped<IProductoRepository, ProductoRepository>();
+        services.AddScoped<IProductoService, ProductoService>();
         return services;
     }
 }
