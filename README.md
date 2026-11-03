@@ -31,14 +31,14 @@ Se incluyen controladores con `[ApiController]`, referencias anulables, inyecci�
 
 El frontend consume las API con Authorization: Bearer. Los permisos se consultan en PostgreSQL y se incluyen en el JWT. Si cambian, se requiere iniciar sesión nuevamente. La sesión vence a los 30 minutos.
 
-Productos, Inventario, Clientes y Proveedores consultan la base real. Ventas, presupuestos, inicio y reportes todavía usan datos locales de demostración; sus operaciones no modifican el stock real.
+Productos, Inventario, Clientes, Proveedores, Compras y Ventas consultan la base real. Presupuestos, Inicio y Reportes todavía conservan datos locales de demostración.
 
 ## Clientes y proveedores: preparación manual
 
 Revisar y ejecutar `src/NexaBack/Infrastructure/Persistence/Sql/006_Separar_Clientes_Proveedores.sql`. El arranque no aplica este script. Crea `comercial.clientes` y `comercial.proveedores` y registra los permisos, sin asignarlos a perfiles ni cargar datos de ejemplo.
 
 
-Plazo de pago y límite de crédito son configuración comercial; todavía no generan saldos ni se aplican en las compras/ventas de demostración. La persistencia de comprobantes y cuentas corrientes queda pendiente; los selectores comerciales ya consultan los clientes/proveedores del backend. Configurar las nuevas acciones de estado desde Permisos y volver a iniciar sesión.
+Plazo de pago y límite de crédito son configuración comercial; todavía no generan saldos ni cuentas corrientes. Compras y Ventas persisten sus comprobantes operativos; la integración de pagos queda pendiente; los selectores comerciales ya consultan los clientes/proveedores del backend. Configurar las nuevas acciones de estado desde Permisos y volver a iniciar sesión.
 
 ## Inventario: preparación manual
 
@@ -160,7 +160,7 @@ El frontend ya consume POST /api/usuarios/auth/login y GET /api/usuarios/auth/me
 
 El frontend envía el token como Bearer y guarda solo token/vencimiento: sessionStorage por defecto o localStorage con Recordar mi sesión. Cerrar sesión borra el token del navegador; no revoca copias existentes. Usuarios consulta los endpoints reales y puede crear cuentas sobre personas y perfiles registrados. Vite y el host .NET del front reenvían /api a NexaBack, por lo que no se habilitó CORS abierto.
 
-Los módulos comerciales del frontend aún usan datos locales. La autenticación real no implica que inventario, ventas o caja estén implementados en el backend.
+Inventario, Compras y Ventas usan sus APIs reales. Los comprobantes locales anteriores se mantienen separados de estas operaciones; Caja no está integrada; las cuentas corrientes de clientes usan la API real.
 
 El perfil https de NexaBack y el perfil IIS Express usan los mismos puertos locales: HTTPS 44388 y HTTP 56953. Ejecutar uno de esos perfiles, no ambos al mismo tiempo. El frontend usa HTTPS 44388 por defecto. El perfil http alternativo conserva 5261 y requiere configurar NEXA_API_URL explícitamente.
 
@@ -179,7 +179,7 @@ Si ya se ejecutó la versión del 006 que conservaba `vinculos_respaldo`, ejecut
 
 Los ABM comerciales tienen capas independientes: `Repository/Clientes` y `Services/Clientes` contienen `IClienteRepository`, `ClienteRepository`, `IClienteService` y `ClienteService`; Proveedores tiene sus equivalentes en sus propias carpetas. Cada controlador recibe el servicio de su módulo y cada repositorio consulta exclusivamente su tabla. Los DTO de estructura común permanecen compartidos en `Infrastructure/Data/Dtos/Comercial`.
 
-Los catálogos comerciales se consultan en `/api/clientes` y `/api/proveedores`, recorriendo todas las páginas y respetando los permisos de consulta. Ventas y Presupuestos permiten seleccionar clientes activos; Compras usa su API propia para buscar proveedores y productos activos y elegir depósitos reales. No se usa un consumidor final ficticio ni contactos del template como alternativa ante errores. Los catálogos se actualizan al navegar o volver a la ventana y se mantienen en memoria, fuera de localStorage. Los IDs reales usan prefijos `clientes:` y `proveedores:` para impedir que los antiguos comprobantes locales se asocien por error a personas reales. Los contactos antiguos no disponibles se muestran como tales; no se borran los comprobantes locales anteriores.
+Los catálogos comerciales se consultan en `/api/clientes` y `/api/proveedores`, recorriendo todas las páginas y respetando los permisos de consulta. Presupuestos permite seleccionar clientes activos; Ventas usa su propia API de clientes, productos y depósitos; Compras usa su API propia para buscar proveedores y productos activos y elegir depósitos reales. No se usa un consumidor final ficticio ni contactos del template como alternativa ante errores. Los catálogos se actualizan al navegar o volver a la ventana y se mantienen en memoria, fuera de localStorage. Los IDs reales usan prefijos `clientes:` y `proveedores:` para impedir que los antiguos comprobantes locales se asocien por error a personas reales. Los contactos antiguos no disponibles se muestran como tales; no se borran los comprobantes locales anteriores.
 
 ## Compras conectadas a NexaBack
 
@@ -189,6 +189,48 @@ El flujo es Pendiente → Recibida o Pendiente → Cancelada. Crear una orden gu
 
 `comercial.compras` y `comercial.compras_detalles` guardan auditoría de creación y modificación. Los nombres, códigos, unidades y costos de la orden se conservan como datos históricos. El total se calcula en el servidor redondeando cada subtotal a dos decimales; no incluye impuestos, facturación fiscal ni pagos. Recibir una compra modifica existencias y movimientos, sin reemplazar automáticamente el costo ni el precio de venta del catálogo.
 
-El front usa `comprasListado.tsx`, `comprasEdicion.tsx`, `comprasDetalle.tsx`, `comprasServicio.ts` y `comprasTipos.ts`. Los catálogos mínimos de Compras requieren `compras.crear`; no necesitan acceso administrativo a Depósitos. No se importan órdenes del template. Ventas, Presupuestos, Inicio y Reportes todavía conservan su demostración local y no reflejan automáticamente las compras reales.
+El front usa `comprasListado.tsx`, `comprasEdicion.tsx`, `comprasDetalle.tsx`, `comprasServicio.ts` y `comprasTipos.ts`. Los catálogos mínimos de Compras requieren `compras.crear`; no necesitan acceso administrativo a Depósitos. No se importan órdenes del template. Presupuestos, Inicio y Reportes todavía conservan su demostración local y no reflejan automáticamente las compras y ventas reales.
 
 Tipo de documento comercial: los ABM de Clientes y Proveedores exigen seleccionar CI (Cédula de identidad), RUC, PASAPORTE u OTRO. El backend valida el catálogo y normaliza el código. Ejecutar manualmente 010_Tipo_Documento_Comercial.sql después del 009, con el backend detenido. Los registros anteriores quedan con tipo nulo y se muestran como Sin definir, hasta que se editen para clasificarlos. El índice único es por tipo y número dentro de cada tabla; ante una coincidencia con un registro anterior sin clasificar, se solicita editar ese registro para evitar duplicarlo. Las compras nuevas conservan ProveedorTipoDocumento junto al documento histórico; las anteriores no se reclasifican con el tipo actual del proveedor. No se modificó el esquema de Personas.
+
+## Ventas reales
+
+Ejecutar manualmente 011_Ventas.sql con el backend detenido, sobre la base preparada con Clientes independientes y Tipo de documento (009 y 010), Productos e Inventario. El script crea comercial.ventas y comercial.ventas_detalles, sin importar datos del template ni asignar permisos a perfiles. Reiniciar el backend y configurar ventas.ver, ventas.crear y ventas.anular según corresponda.
+
+Flujo del front: buscar un cliente activo, seleccionar depósito y productos reales, agregar cantidades, calcular el total y confirmar la venta. El servidor calcula precios y descuentos con decimales, redondeando cada línea a dos posiciones. El cálculo no reserva stock. Al confirmar se verifican nuevamente las versiones, precios y saldos; si cambiaron, recalcular y revisar antes de confirmar. Los precios y el total no se aceptan desde el cliente como valores autoritativos.
+
+Confirmar guarda venta, detalle, salidas de inventario y nuevos saldos en una transacción serializable. El UUID de operación y el hash de contenido permiten recuperar la venta en reintentos, sin repetir salidas. Si se pierde una respuesta, el formulario bloquea cambios y ofrece reintentar exactamente la misma confirmación. No crear otra venta hasta comprobar el resultado.
+
+La anulación requiere permiso, versión y motivo. Devuelve toda la cantidad al depósito original mediante nuevas entradas, conserva los movimientos de salida y guarda fecha, usuario y motivo de anulación. Repetir la misma anulación no devuelve stock nuevamente. El depósito original debe estar activo; se permite devolver productos que se desactivaron después de venderlos. No hay anulaciones parciales en esta etapa.
+
+La venta conserva nombre, tipo y número de documento del cliente; depósito; nombres, códigos, unidades, costos y precios de los productos. Confirmada describe la operación de stock: no significa Pagada. Los cobros y las cuentas corrientes de clientes usan la API real. No integra caja ni impuestos desglosados y no emite documentación fiscal. Inicio y Reportes todavía muestran la demostración local. La conversión de presupuestos del template se deshabilita hasta conectar Presupuestos al backend, para evitar asociar IDs locales con productos reales.
+
+Código del front en ventasListado.tsx, ventasEdicion.tsx, ventasDetalle.tsx, ventasServicio.ts y ventasTipos.ts. El editor local de presupuestos se separó en presupuestosEdicion.tsx. Los comprobantes antiguos de Inicio se conservan para consulta, sin botones de cobro o anulación.
+
+## Cobros y cuentas corrientes de clientes
+
+Ejecutar manualmente 012_Cobros_Cuentas_Corrientes.sql, ubicado en back/src/NexaBack/Infrastructure/Persistence/Sql, después del 011 y con el backend detenido. El script crea comercial.cobros con auditoría y agrega el catálogo de permisos; no asigna permisos a perfiles ni carga datos de ejemplo. Reiniciar backend, configurar ventas.cobrar, ventas.anular_cobro y clientes.cuenta_corriente, y volver a iniciar sesión para renovar el token.
+
+En Ventas > Ver detalle > Cobros se registran importes parciales o totales, fecha, medio, referencia y observaciones. El backend impide superar el saldo, protege operaciones simultáneas mediante transacciones y versiones y recupera reintentos con el mismo UUID. Ante una respuesta perdida, reintentar la misma operación antes de registrar otra.
+
+Anular un cobro exige permiso y motivo, conserva su historial y reabre el saldo. No ejecuta devoluciones bancarias ni movimientos de stock. Una venta con cobros vigentes no puede anularse: primero deben anularse sus cobros.
+
+Clientes > Cuenta corriente muestra ventas, cobros, anulaciones y saldo, incluso para clientes inactivos. Los totales se calculan con ventas confirmadas y cobros vigentes; no se almacena un saldo duplicado. Ambos historiales tienen paginación independiente. Inicio y Reportes siguen pendientes de conexión; no hay integración con Caja ni bancos.
+
+El código mantiene servicios y repositorios independientes para Cobros y CuentasCorrientes. En React, los módulos principales son cobrosVenta.tsx, cobrosServicio.ts y clientesCuentaCorriente.tsx, con sus tipos y comentarios en español.
+
+## Pagos y cuenta corriente de proveedores
+
+Ejecutar manualmente 013_Pagos_Cuentas_Proveedores.sql (back/src/NexaBack/Infrastructure/Persistence/Sql), con el backend detenido. Requiere Compras (008) y los datos comerciales de Proveedores (009 y 010). No ejecuta los scripts anteriores ni modifica stock. Crea comercial.pagos con fechas y usuarios de creación/modificación, versiones, identificador único de operación e historial de anulación. No hay otra tabla de saldos.
+
+Después de ejecutarlo, reiniciar backend, asignar compras.pagar, compras.anular_pago y proveedores.cuenta_corriente desde Permisos y volver a iniciar sesión. El script solo incorpora el catálogo; no amplía permisos de perfiles automáticamente. Para operar desde el detalle se requiere también compras.ver; para abrir el listado de Proveedores, proveedores.ver.
+
+Compras > Ver detalle > Pagos permite registrar pagos parciales o totales de compras recibidas, con fecha, medio, referencia y observaciones. Las compras pendientes y canceladas no generan deuda ni admiten pagos. Los proveedores inactivos conservan su cuenta y se permite pagar sus compras ya recibidas.
+
+El backend calcula el saldo y no acepta sobrepagos. La operación modifica la versión de la compra y registra el pago en una transacción serializable para proteger pagos simultáneos. El UUID y el hash de contenido permiten recuperar una respuesta perdida sin duplicar el pago; la pantalla bloquea cambios y ofrece reintentar la misma operación. Un conflicto requiere actualizar y revisar el saldo antes de continuar.
+
+Anular un pago exige permiso, versión y motivo: conserva el registro, fecha y usuario de anulación y reabre el saldo. No modifica inventario ni realiza transferencias bancarias o movimientos de Caja. Una compra recibida sigue sin poder cancelarse; las devoluciones quedan para otra etapa.
+
+Proveedores > Cuenta corriente muestra compras, pagos y saldo pendiente, con dos historiales paginados y acceso al detalle si se dispone de compras.ver. La deuda se calcula únicamente con compras recibidas menos pagos vigentes, en una instantánea consistente de lectura. El historial conserva compras pendientes/canceladas y pagos anulados sin sumarlos a la deuda.
+
+El backend usa IPagoRepository/PagoRepository, IPagoService/PagoService y sus equivalentes CuentaProveedor. El front mantiene pagosCompra.tsx, pagosServicio.ts, pagosTipos.ts y proveedoresCuentaCorriente.tsx con su servicio y tipos. Inicio y Reportes todavía no reflejan estas operaciones reales.
