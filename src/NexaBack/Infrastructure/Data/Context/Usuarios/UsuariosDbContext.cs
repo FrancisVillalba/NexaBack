@@ -1,3 +1,5 @@
+using NexaBack.Infrastructure.Data.Context.Compras.Entity;
+using NexaBack.Infrastructure.Data.Context.Compras.Configurations;
 using NexaBack.Infrastructure.Data.Context.Usuarios.Entity;
 using Microsoft.EntityFrameworkCore;
 using NexaBack.Infrastructure.Data.Context.Usuarios.Configurations;
@@ -6,6 +8,8 @@ using NexaBack.Infrastructure.Data.Context.Productos.Entity;
 using NexaBack.Infrastructure.Data.Context.Productos.Configurations;
 using NexaBack.Infrastructure.Data.Context.Inventario.Entity;
 using NexaBack.Infrastructure.Data.Context.Inventario.Configurations;
+using NexaBack.Infrastructure.Data.Context.Comercial.Entity;
+using NexaBack.Infrastructure.Data.Context.Comercial.Configurations;
 
 namespace NexaBack.Infrastructure.Data.Context.Usuarios;
 
@@ -21,11 +25,17 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
     public DbSet<Deposito> Depositos => Set<Deposito>();
     public DbSet<Existencia> Existencias => Set<Existencia>();
     public DbSet<MovimientoInventario> MovimientosInventario => Set<MovimientoInventario>();
+    public DbSet<Compra> Compras => Set<Compra>();
+    public DbSet<CompraDetalle> ComprasDetalles => Set<CompraDetalle>();
+    public DbSet<Cliente> Clientes => Set<Cliente>();
+    public DbSet<Proveedor> Proveedores => Set<Proveedor>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("usuarios");
+        modelBuilder.ApplyConfiguration(new CompraConfiguration());
+        modelBuilder.ApplyConfiguration(new CompraDetalleConfiguration());
         modelBuilder.ApplyConfiguration(new PersonaConfiguration());
         modelBuilder.ApplyConfiguration(new UsuarioConfiguration());
         modelBuilder.ApplyConfiguration(new PerfilConfiguration());
@@ -35,7 +45,10 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
         modelBuilder.ApplyConfiguration(new DepositoConfiguration());
         modelBuilder.ApplyConfiguration(new ExistenciaConfiguration());
         modelBuilder.ApplyConfiguration(new MovimientoInventarioConfiguration());
-        foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(x => typeof(IEntidadAuditable).IsAssignableFrom(x.ClrType)).ToArray())
+        modelBuilder.ApplyConfiguration(new ClienteConfiguration());
+        modelBuilder.ApplyConfiguration(new ProveedorConfiguration());
+        modelBuilder.HasSequence<int>("registros_comerciales_id_seq", "comercial");
+        foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(x => typeof(IEntidadAuditable).IsAssignableFrom(x.ClrType) && x.BaseType == null).ToArray())
         {
             var builder = modelBuilder.Entity(entity.ClrType);
             builder.Property<DateTime>(nameof(IEntidadAuditable.CreadoEn)).HasDefaultValueSql("CURRENT_TIMESTAMP");

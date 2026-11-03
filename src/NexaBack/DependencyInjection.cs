@@ -1,3 +1,5 @@
+using NexaBack.Repository.Compras;
+using NexaBack.Services.Compras;
 using NexaBack.Repository.Usuarios.Perfiles;
 using NexaBack.Repository.Usuarios.Usuarios;
 using NexaBack.Repository.Usuarios.Personas;
@@ -11,6 +13,10 @@ using NexaBack.Repository.Productos;
 using NexaBack.Services.Productos;
 using NexaBack.Repository.Inventario;
 using NexaBack.Services.Inventario;
+using NexaBack.Repository.Clientes;
+using NexaBack.Repository.Proveedores;
+using NexaBack.Services.Clientes;
+using NexaBack.Services.Proveedores;
 
 namespace NexaBack;
 
@@ -36,6 +42,12 @@ public static class DependencyInjection
         services.AddScoped<IInventarioService, InventarioService>();
         services.AddScoped<IDepositoRepository, DepositoRepository>();
         services.AddScoped<IDepositoService, DepositoService>();
+        services.AddScoped<IClienteRepository, ClienteRepository>();
+        services.AddScoped<IProveedorRepository, ProveedorRepository>();
+        services.AddScoped<IClienteService, ClienteService>();
+        services.AddScoped<IProveedorService, ProveedorService>();
+        services.AddScoped<ICompraRepository, CompraRepository>();
+        services.AddScoped<ICompraService, CompraService>();
         return services;
     }
 }

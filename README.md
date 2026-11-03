@@ -31,7 +31,14 @@ Se incluyen controladores con `[ApiController]`, referencias anulables, inyecci�
 
 El frontend consume las API con Authorization: Bearer. Los permisos se consultan en PostgreSQL y se incluyen en el JWT. Si cambian, se requiere iniciar sesión nuevamente. La sesión vence a los 30 minutos.
 
-Productos e Inventario consultan la base real. Compras, ventas, presupuestos, clientes, proveedores, inicio y reportes todavía usan datos locales de demostración; sus operaciones no modifican el stock real.
+Productos, Inventario, Clientes y Proveedores consultan la base real. Ventas, presupuestos, inicio y reportes todavía usan datos locales de demostración; sus operaciones no modifican el stock real.
+
+## Clientes y proveedores: preparación manual
+
+Revisar y ejecutar `src/NexaBack/Infrastructure/Persistence/Sql/006_Separar_Clientes_Proveedores.sql`. El arranque no aplica este script. Crea `comercial.clientes` y `comercial.proveedores` y registra los permisos, sin asignarlos a perfiles ni cargar datos de ejemplo.
+
+
+Plazo de pago y límite de crédito son configuración comercial; todavía no generan saldos ni se aplican en las compras/ventas de demostración. La persistencia de comprobantes y cuentas corrientes queda pendiente; los selectores comerciales ya consultan los clientes/proveedores del backend. Configurar las nuevas acciones de estado desde Permisos y volver a iniciar sesión.
 
 ## Inventario: preparación manual
 
@@ -163,3 +170,25 @@ El perfil https de NexaBack y el perfil IIS Express usan los mismos puertos loca
 Administración > Depósitos permite crear, editar, activar y desactivar con auditoría. Ejecutar manualmente `src/NexaBack/Infrastructure/Persistence/Sql/004_Depositos.sql` después de tener Inventario instalado; agrega Descripcion, Version y los permisos depositos.ver/crear/editar/estado. No crea depósitos de ejemplo. Reiniciar la API e iniciar sesión nuevamente.
 
 El nombre es único sin distinguir mayúsculas ni espacios extremos. No se desactiva un depósito con existencias; la comprobación y el cambio de estado son transaccionales. Los movimientos también actualizan su versión para proteger operaciones simultáneas. La administración de depósitos es exclusiva de Administrador.
+
+Clientes y Proveedores guardan nombre o razón social, documento / RUC, correo, teléfono y dirección en sus propias tablas. Personas queda destinada a los usuarios del sistema. Los registros comerciales no exigen apellidos ni seleccionan o crean una Persona. Un mismo documento puede existir en Personas, Clientes y Proveedores; dentro de cada tabla comercial se controla la duplicación por tipo y número de documento. El alta y la edición modifican únicamente el módulo correspondiente, con auditoría y control de versión.
+
+Sobre una instalación que ya tenga comercial.clientes y comercial.proveedores, ejecutar manualmente 009_Clientes_Proveedores_Datos_Propios.sql con el backend detenido. Copia los datos antes asociados a Personas, conserva IDs, auditoría y compras, y elimina PersonaId de las tablas comerciales. No elimina personas existentes. Si faltan datos obligatorios de origen, aborta sin dejar cambios parciales para permitir corregirlos y repetir el script. Luego reiniciar backend y recargar front; no requiere permisos nuevos.
+
+Si ya se ejecutó la versión del 006 que conservaba `vinculos_respaldo`, ejecutar manualmente `007_Eliminar_Vinculos_Respaldo.sql` para quitar esa tabla.
+
+Los ABM comerciales tienen capas independientes: `Repository/Clientes` y `Services/Clientes` contienen `IClienteRepository`, `ClienteRepository`, `IClienteService` y `ClienteService`; Proveedores tiene sus equivalentes en sus propias carpetas. Cada controlador recibe el servicio de su módulo y cada repositorio consulta exclusivamente su tabla. Los DTO de estructura común permanecen compartidos en `Infrastructure/Data/Dtos/Comercial`.
+
+Los catálogos comerciales se consultan en `/api/clientes` y `/api/proveedores`, recorriendo todas las páginas y respetando los permisos de consulta. Ventas y Presupuestos permiten seleccionar clientes activos; Compras usa su API propia para buscar proveedores y productos activos y elegir depósitos reales. No se usa un consumidor final ficticio ni contactos del template como alternativa ante errores. Los catálogos se actualizan al navegar o volver a la ventana y se mantienen en memoria, fuera de localStorage. Los IDs reales usan prefijos `clientes:` y `proveedores:` para impedir que los antiguos comprobantes locales se asocien por error a personas reales. Los contactos antiguos no disponibles se muestran como tales; no se borran los comprobantes locales anteriores.
+
+## Compras conectadas a NexaBack
+
+Ejecutar manualmente `back/src/NexaBack/Infrastructure/Persistence/Sql/008_Compras.sql` (desde el backend: `src/NexaBack/Infrastructure/Persistence/Sql/008_Compras.sql`). Requiere las tablas de Proveedores, Productos e Inventario ya preparadas. El arranque no crea tablas ni ejecuta SQL. Después reiniciar el backend; asignar `compras.ver`, `compras.crear`, `compras.recibir` y el nuevo `compras.cancelar` según el perfil y volver a iniciar sesión. El script no asigna permisos a perfiles.
+
+El flujo es Pendiente → Recibida o Pendiente → Cancelada. Crear una orden guarda cabecera y detalle sin cambiar stock. La recepción es completa: valida proveedor, depósito, productos y unidades activos; registra una entrada por línea y actualiza las existencias en la misma transacción. Cada línea guarda el ID del movimiento para consultar su trazabilidad. Los reintentos de recepción no vuelven a sumar cantidades. Las versiones y la transacción serializable rechazan modificaciones simultáneas; ante un conflicto, actualizar y reintentar. Las compras recibidas no se cancelan; devoluciones y recepciones parciales quedan para una etapa posterior.
+
+`comercial.compras` y `comercial.compras_detalles` guardan auditoría de creación y modificación. Los nombres, códigos, unidades y costos de la orden se conservan como datos históricos. El total se calcula en el servidor redondeando cada subtotal a dos decimales; no incluye impuestos, facturación fiscal ni pagos. Recibir una compra modifica existencias y movimientos, sin reemplazar automáticamente el costo ni el precio de venta del catálogo.
+
+El front usa `comprasListado.tsx`, `comprasEdicion.tsx`, `comprasDetalle.tsx`, `comprasServicio.ts` y `comprasTipos.ts`. Los catálogos mínimos de Compras requieren `compras.crear`; no necesitan acceso administrativo a Depósitos. No se importan órdenes del template. Ventas, Presupuestos, Inicio y Reportes todavía conservan su demostración local y no reflejan automáticamente las compras reales.
+
+Tipo de documento comercial: los ABM de Clientes y Proveedores exigen seleccionar CI (Cédula de identidad), RUC, PASAPORTE u OTRO. El backend valida el catálogo y normaliza el código. Ejecutar manualmente 010_Tipo_Documento_Comercial.sql después del 009, con el backend detenido. Los registros anteriores quedan con tipo nulo y se muestran como Sin definir, hasta que se editen para clasificarlos. El índice único es por tipo y número dentro de cada tabla; ante una coincidencia con un registro anterior sin clasificar, se solicita editar ese registro para evitar duplicarlo. Las compras nuevas conservan ProveedorTipoDocumento junto al documento histórico; las anteriores no se reclasifican con el tipo actual del proveedor. No se modificó el esquema de Personas.

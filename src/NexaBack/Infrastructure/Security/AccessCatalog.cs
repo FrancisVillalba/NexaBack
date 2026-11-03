@@ -21,13 +21,13 @@ public static class AccessCatalog
                 "password" => "Cambiar contraseñas", "recibir" => "Recibir mercadería", "anular" => "Anular ventas",
                 "cobrar" => "Registrar cobros", "eliminar" => "Eliminar", "convertir" => "Convertir en venta",
                 "cuenta_corriente" => "Consultar cuenta corriente", "exportar" => "Exportar",
-                "restablecer" => "Restablecer datos", _ => action
+                "cancelar" => "Cancelar compras pendientes", "restablecer" => "Restablecer datos", _ => action
             }));
         }
         Add("inicio", "ver"); Add("productos", "ver", "crear", "editar", "estado"); Add("inventario", "ver");
-        Add("movimientos", "ver", "crear"); Add("compras", "ver", "crear", "recibir");
+        Add("movimientos", "ver", "crear"); Add("compras", "ver", "crear", "recibir", "cancelar");
         Add("ventas", "ver", "crear", "anular", "cobrar"); Add("presupuestos", "ver", "crear", "eliminar", "convertir");
-        Add("clientes", "ver", "crear", "editar", "cuenta_corriente"); Add("proveedores", "ver", "crear", "editar");
+        Add("clientes", "ver", "crear", "editar", "estado", "cuenta_corriente"); Add("proveedores", "ver", "crear", "editar", "estado");
         Add("reportes", "ver", "exportar"); Add("configuracion", "ver", "editar", "restablecer");
         Add("personas", "ver", "crear", "editar", "estado"); Add("usuarios", "ver", "crear", "editar", "estado", "password");
         Add("perfiles", "ver", "crear", "editar", "estado"); Add("permisos", "ver", "editar");
