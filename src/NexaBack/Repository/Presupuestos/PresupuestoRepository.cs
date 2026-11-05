@@ -34,7 +34,7 @@ public sealed class PresupuestoRepository(UsuariosDbContext context, IVentaRepos
 
     public async Task<VentaCotizacionDto> CotizarAsync(VentaCotizarRequest request, CancellationToken ct)
     {
-        var cliente = await context.Clientes.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.ClienteId, ct);
+        var cliente = await context.Clientes.AsNoTracking().Include(x => x.TipoDocumento).SingleOrDefaultAsync(x => x.Id == request.ClienteId, ct);
         if (cliente is null || !cliente.Activo) throw new BusinessException("El cliente no existe o está inactivo.");
         var deposito = await context.Depositos.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
         if (deposito is null || !deposito.Activo) throw new BusinessException("El depósito no existe o está inactivo.");
@@ -82,8 +82,8 @@ public sealed class PresupuestoRepository(UsuariosDbContext context, IVentaRepos
                 foreach (var linea in calculo.Items)
                     if (request.Items.Single(x => x.ProductoId == linea.ProductoId).VersionProducto != linea.VersionProducto)
                         throw new BusinessException("Cambió un producto. Calculá nuevamente y revisá los precios antes de guardar.", 409);
-                var cliente = await context.Clientes.AsNoTracking().SingleAsync(x => x.Id == request.ClienteId, ct);
-                p.ClienteId = cliente.Id; p.ClienteNombre = cliente.NombreRazonSocial; p.ClienteDocumento = cliente.Documento; p.ClienteTipoDocumento = cliente.TipoDocumento;
+                var cliente = await context.Clientes.AsNoTracking().Include(x => x.TipoDocumento).SingleAsync(x => x.Id == request.ClienteId, ct);
+                p.ClienteId = cliente.Id; p.ClienteNombre = cliente.NombreRazonSocial; p.ClienteDocumento = cliente.Documento; p.ClienteTipoDocumento = cliente.TipoDocumento?.Nombre;
                 p.DepositoId = calculo.DepositoId; p.DepositoNombre = calculo.DepositoNombre; p.FechaVencimiento = request.FechaVencimiento;
                 p.Observaciones = request.Observaciones; p.Subtotal = calculo.Subtotal; p.Descuento = calculo.Descuento; p.Total = calculo.Total; p.Version = Guid.NewGuid();
                 if (id.HasValue) { p.EdicionOperacionId = request.OperacionId; p.EdicionHash = hash; }

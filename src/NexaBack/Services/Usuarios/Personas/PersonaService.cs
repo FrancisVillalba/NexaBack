@@ -1,3 +1,4 @@
+using NexaBack.Services.TiposDocumento;
 using NexaBack.Repository.Usuarios.Personas;
 using NexaBack.Infrastructure.Data.Context.Usuarios.Entity;
 using NexaBack.Common;
@@ -5,7 +6,7 @@ using NexaBack.Infrastructure.Data.Dtos.Personas;
 
 namespace NexaBack.Services.Usuarios.Personas;
 
-public sealed class PersonaService(IPersonaRepository repository) : IPersonaService
+public sealed class PersonaService(IPersonaRepository repository, ITipoDocumentoService tipos) : IPersonaService
 {
     public async Task<IReadOnlyList<PersonaDto>> ListarAsync(
         int pagina = 1, int tamanoPagina = 20, string? buscar = null, bool? activo = null, CancellationToken cancellationToken = default)
@@ -33,11 +34,12 @@ public sealed class PersonaService(IPersonaRepository repository) : IPersonaServ
         var correo = Validation.Email(request.Correo);
         var telefono = Validation.Optional(request.Telefono, "Teléfono", 30);
         var direccion = Validation.Optional(request.Direccion, "Dirección", 300);
-        if (await repository.ExisteDocumentoAsync(documento, cancellationToken))
-            throw new BusinessException("Ya existe una persona con ese documento.", 409);
+        var tipo = await tipos.ValidarAsync(request.TipoDocumentoId, null, cancellationToken);
+        if (await repository.ExisteDocumentoAsync(request.TipoDocumentoId, documento, cancellationToken))
+            throw new BusinessException("Ya existe una persona con ese tipo y número de documento, o una anterior sin tipo definido.", 409);
         var entity = new Persona
         {
-            Nombres = nombres, Apellidos = apellidos, Documento = documento,
+            Nombres = nombres, Apellidos = apellidos, TipoDocumentoId = tipo.Id, TipoDocumento = tipo, Documento = documento,
             Correo = correo, Telefono = telefono, Direccion = direccion
         };
         await repository.AgregarAsync(entity, cancellationToken);
@@ -58,11 +60,14 @@ public sealed class PersonaService(IPersonaRepository repository) : IPersonaServ
         var correo = Validation.Email(request.Correo);
         var telefono = Validation.Optional(request.Telefono, "Teléfono", 30);
         var direccion = Validation.Optional(request.Direccion, "Dirección", 300);
-        if (await repository.ExisteDocumentoAsync(documento, cancellationToken, excluirId: id))
-            throw new BusinessException("Ya existe una persona con ese documento.", 409);
+        var tipo = await tipos.ValidarAsync(request.TipoDocumentoId, persona.TipoDocumentoId, cancellationToken);
+        if (await repository.ExisteDocumentoAsync(request.TipoDocumentoId, documento, cancellationToken, excluirId: id))
+            throw new BusinessException("Ya existe una persona con ese tipo y número de documento, o una anterior sin tipo definido.", 409);
 
         persona.Nombres = nombres;
         persona.Apellidos = apellidos;
+        persona.TipoDocumentoId = tipo.Id;
+        persona.TipoDocumento = tipo;
         persona.Documento = documento;
         persona.Correo = correo;
         persona.Telefono = telefono;
@@ -80,5 +85,5 @@ public sealed class PersonaService(IPersonaRepository repository) : IPersonaServ
             throw new BusinessException("No podés desactivar a la persona del último administrador activo.", 409);
     }
 
-    private static PersonaDto Map(Persona x) => new(x.Id, x.Nombres, x.Apellidos, x.Documento, x.Correo, x.Telefono, x.Direccion, x.Activo, x.CreadoEn);
+    private static PersonaDto Map(Persona x) => new(x.Id, x.Nombres, x.Apellidos, x.TipoDocumentoId, x.TipoDocumento?.Nombre, x.Documento, x.Correo, x.Telefono, x.Direccion, x.Activo, x.CreadoEn);
 }

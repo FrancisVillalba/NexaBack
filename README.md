@@ -38,7 +38,7 @@ Productos, Inventario, Clientes, Proveedores, Compras y Ventas consultan la base
 Revisar y ejecutar `src/NexaBack/Infrastructure/Persistence/Sql/006_Separar_Clientes_Proveedores.sql`. El arranque no aplica este script. Crea `comercial.clientes` y `comercial.proveedores` y registra los permisos, sin asignarlos a perfiles ni cargar datos de ejemplo.
 
 
-Plazo de pago y límite de crédito son configuración comercial; todavía no generan saldos ni cuentas corrientes. Compras y Ventas persisten sus comprobantes operativos; la integración de pagos queda pendiente; los selectores comerciales ya consultan los clientes/proveedores del backend. Configurar las nuevas acciones de estado desde Permisos y volver a iniciar sesión.
+Clientes y Proveedores conservan sus datos de identificación, contacto y observaciones. Compras, Ventas, pagos y cobros usan sus APIs reales. Configurar las nuevas acciones de estado desde Permisos y volver a iniciar sesión.
 
 ## Inventario: preparación manual
 
@@ -191,7 +191,7 @@ El flujo es Pendiente → Recibida o Pendiente → Cancelada. Crear una orden gu
 
 El front usa `comprasListado.tsx`, `comprasEdicion.tsx`, `comprasDetalle.tsx`, `comprasServicio.ts` y `comprasTipos.ts`. Los catálogos mínimos de Compras requieren `compras.crear`; no necesitan acceso administrativo a Depósitos. No se importan órdenes del template. Inicio y Reportes consultan las compras y ventas reales mediante su API.
 
-Tipo de documento comercial: los ABM de Clientes y Proveedores exigen seleccionar CI (Cédula de identidad), RUC, PASAPORTE u OTRO. El backend valida el catálogo y normaliza el código. Ejecutar manualmente 010_Tipo_Documento_Comercial.sql después del 009, con el backend detenido. Los registros anteriores quedan con tipo nulo y se muestran como Sin definir, hasta que se editen para clasificarlos. El índice único es por tipo y número dentro de cada tabla; ante una coincidencia con un registro anterior sin clasificar, se solicita editar ese registro para evitar duplicarlo. Las compras nuevas conservan ProveedorTipoDocumento junto al documento histórico; las anteriores no se reclasifican con el tipo actual del proveedor. No se modificó el esquema de Personas.
+Antecedente del SQL 010: incorporó CI, RUC, PASAPORTE y OTRO como códigos en Clientes/Proveedores. A partir del SQL 015, los tres ABM usan el catálogo compartido y envían TipoDocumentoId; ya no existe una lista fija en el front o en la validación del back. Ejecutar manualmente 010_Tipo_Documento_Comercial.sql después del 009, con el backend detenido. Los registros anteriores quedan con tipo nulo y se muestran como Sin definir, hasta que se editen para clasificarlos. El índice único es por tipo y número dentro de cada tabla; ante una coincidencia con un registro anterior sin clasificar, se solicita editar ese registro para evitar duplicarlo. Las compras nuevas conservan ProveedorTipoDocumento junto al documento histórico; las anteriores no se reclasifican con el tipo actual del proveedor. El SQL 010 no modificaba Personas; el SQL 015 sí incorpora su relación con el catálogo.
 
 ## Ventas reales
 
@@ -270,3 +270,31 @@ Inicio filtra las secciones desde el backend según los permisos firmados en el 
 Exportar CSV completo consulta nuevamente el backend y exporta todas las filas filtradas, no solo la página visible. Cada archivo incorpora depósito, período/situación actual, fecha de generación y totales de esa misma instantánea. Máximo 10.000 filas: si se supera, solicita reducir el filtro y rechaza la exportación completa en lugar de truncarla. El CSV conserva decimales, escapa separadores/comillas y protege los textos interpretables como fórmulas. Imprimir página imprime la vista visible.
 
 El front usa inicioServicio.ts y reportesServicio.ts/reportesTipos.ts/reportesTabla.tsx/reportesColumnas.ts/reportesGraficos.tsx, con comentarios en español. Se retiró el gráfico de demostración con fechas fijas. Configuración conserva su demostración local. No se agregó integración con Caja, bancos ni facturación fiscal.
+
+## Catálogo de tipos de documento
+
+Ejecutar manualmente 015_Tipos_Documento.sql (back/src/NexaBack/Infrastructure/Persistence/Sql), con el backend detenido, después de tener instalados los módulos anteriores hasta Presupuestos (014). Si ya se ejecutaron los scripts previos, ejecutar solo el 015. No volver a ejecutar el antiguo 010 sobre la estructura normalizada.
+
+El script crea catalogo.tipos_documento con Id, Codigo único, Nombre, Activo, Version y fechas/usuarios de creación y modificación. Incorpora como referencias iniciales CI, RUC, PASAPORTE y OTRO, buscando sus IDs por código. Los IDs no están fijos en el código ni en los formularios. Los tipos adicionales cargados en esa tabla aparecen al volver a abrir los formularios, sin recompilar.
+
+Clientes y Proveedores (comercial) y Personas (usuarios) guardan TipoDocumentoId como FK restrictiva al catálogo. El campo de texto anterior de Clientes/Proveedores se transforma mediante correspondencia de códigos y se elimina solo después de validar las relaciones. Cada módulo conserva su tabla, servicio y repositorio. El catálogo tiene ITipoDocumentoRepository/TipoDocumentoRepository e ITipoDocumentoService/TipoDocumentoService.
+
+Las personas y contactos anteriores sin clasificar conservan TipoDocumentoId nulo; no se les asigna CI ni OTRO por suposición. En altas y ediciones, tanto tipo como número son obligatorios. Se valida en el servidor que el ID exista y esté activo. Un registro puede conservar su tipo actual si luego se desactivó; no se permite asignar un tipo inactivo a otro registro.
+
+La unicidad pasa a (TipoDocumentoId, Documento) en cada una de las tres tablas: el mismo número puede pertenecer a tipos distintos y también a módulos distintos. Un índice adicional protege documentos históricos aún sin tipo. Si un número coincide con un registro sin clasificar, primero debe clasificarse ese registro, evitando duplicarlo. Las FKs impiden borrar un tipo utilizado.
+
+El SQL aborta y revierte si encuentra códigos anteriores sin correspondencia, IDs contradictorios o documentos duplicados dentro del mismo tipo/sin clasificar. Conserva IDs de personas/contactos, usuarios, operaciones, stock, saldos y auditoría existente. No usa CASCADE para quitar dependencias externas; si hubiera una, se debe revisar antes de migrar.
+
+GET /api/tipos-documento entrega Id, Codigo, Nombre y Activo. Requiere autenticación y al menos un permiso de consulta/alta/edición de Clientes, Proveedores o Personas. No agrega permisos a perfiles. Se devuelve el catálogo completo para poder representar tipos inactivos existentes; los formularios ofrecen tipos activos y, al editar, el tipo actual inactivo. No hay una lista fija ni una alternativa desde localStorage si falla la API.
+
+Los DTO de Clientes/Proveedores y Personas devuelven tipoDocumentoId y tipoDocumento (descripción). Sus solicitudes de escritura reciben solo tipoDocumentoId numérico. Las búsquedas para Compras/Ventas/Presupuestos y las cuentas corrientes resuelven el nombre mediante la relación. La selección de personas en Usuarios también muestra el tipo para distinguir números iguales de tipos diferentes.
+
+Compras, Ventas y Presupuestos conservan el tipo de documento como dato histórico en sus cabeceras. Los comprobantes nuevos copian la descripción completa del catálogo; los anteriores conservan el código/texto que tenían, incluso si se renombra el catálogo. El SQL amplía esas columnas a 100 caracteres, sin reescribir sus valores ni exigir relaciones nuevas a comprobantes antiguos.
+
+El front comparte tiposDocumentoServicio.ts, tiposDocumentoEstado.ts, tiposDocumentoSelector.tsx y tiposDocumentoTipos.ts. Muestra carga/error/reintento y bloquea guardar sin una selección válida. Reiniciar backend y recargar el front después del SQL. No se agregó un ABM de mantenimiento de este catálogo; esta etapa incorpora tabla, lectura y selección en los tres formularios.
+
+## Retiro de condiciones comerciales del contacto
+
+Ejecutar manualmente 016_Quitar_Condiciones_Comerciales.sql con el backend detenido, después de los scripts anteriores hasta 015. Elimina PlazoPagoDias y LimiteCredito de comercial.clientes y comercial.proveedores y sus restricciones. No conserva ni traslada sus valores a comprobantes. No usa CASCADE ni modifica operaciones, inventario o cuentas corrientes. Reiniciar el backend y recargar el front.
+
+Los formularios, listados, contratos, entidades, validaciones y catálogos del frontend ya no contienen plazo de pago o límite de crédito. Observaciones permanece disponible. Las condiciones de pago por factura quedan pendientes de implementación; este cambio no agrega campos ni reglas a Ventas/Compras.

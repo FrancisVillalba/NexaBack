@@ -35,7 +35,7 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
 
     public async Task<VentaCotizacionDto> CotizarAsync(VentaCotizarRequest request, CancellationToken ct)
     {
-        var cliente = await context.Clientes.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.ClienteId, ct);
+        var cliente = await context.Clientes.AsNoTracking().Include(x => x.TipoDocumento).SingleOrDefaultAsync(x => x.Id == request.ClienteId, ct);
         if (cliente is null || !cliente.Activo) throw new BusinessException("El cliente no existe o está inactivo.");
         var deposito = await context.Depositos.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
         if (deposito is null || !deposito.Activo) throw new BusinessException("El depósito no existe o está inactivo.");
@@ -86,7 +86,7 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
                 if (anterior.SolicitudHash != hash || anterior.CreadoPor != usuario) throw new BusinessException("Ese identificador de operación ya se utilizó con otros datos.", 409);
                 return Map(anterior);
             }
-            var cliente = await context.Clientes.SingleOrDefaultAsync(x => x.Id == request.ClienteId, ct);
+            var cliente = await context.Clientes.Include(x => x.TipoDocumento).SingleOrDefaultAsync(x => x.Id == request.ClienteId, ct);
             if (cliente is null || !cliente.Activo) throw new BusinessException("El cliente no existe o está inactivo.");
             var deposito = await context.Depositos.SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
             if (deposito is null || !deposito.Activo) throw new BusinessException("El depósito no existe o está inactivo.");
@@ -94,7 +94,7 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
             var productos = await context.Productos.Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
             var saldos = await context.Existencias.Where(x => x.DepositoId == request.DepositoId && ids.Contains(x.ProductoId)).ToDictionaryAsync(x => x.ProductoId, ct);
             var venta = new Venta { OperacionId = request.OperacionId, SolicitudHash = hash, ClienteId = cliente.Id,
-                ClienteNombre = cliente.NombreRazonSocial, ClienteTipoDocumento = cliente.TipoDocumento, ClienteDocumento = cliente.Documento,
+                ClienteNombre = cliente.NombreRazonSocial, ClienteTipoDocumento = cliente.TipoDocumento == null ? null : cliente.TipoDocumento.Nombre, ClienteDocumento = cliente.Documento,
                 DepositoId = deposito.Id, DepositoNombre = deposito.Nombre, Descuento = request.Descuento, Observaciones = request.Observaciones };
             foreach (var item in request.Items)
             {
@@ -176,7 +176,7 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
     {
         var patron = Patron(buscar);
         return await context.Clientes.AsNoTracking().Where(x => x.Activo && (EF.Functions.ILike(x.NombreRazonSocial, patron, "\\") || EF.Functions.ILike(x.Documento, patron, "\\")))
-            .OrderBy(x => x.NombreRazonSocial).ThenBy(x => x.Id).Take(20).Select(x => new VentaClienteDto(x.Id, x.NombreRazonSocial, x.TipoDocumento, x.Documento)).ToListAsync(ct);
+            .OrderBy(x => x.NombreRazonSocial).ThenBy(x => x.Id).Take(20).Select(x => new VentaClienteDto(x.Id, x.NombreRazonSocial, x.TipoDocumento == null ? null : x.TipoDocumento.Nombre, x.Documento)).ToListAsync(ct);
     }
     public async Task<IReadOnlyList<VentaDepositoDto>> DepositosAsync(CancellationToken ct)
         => await context.Depositos.AsNoTracking().Where(x => x.Activo).OrderBy(x => x.Nombre).Select(x => new VentaDepositoDto(x.Id, x.Nombre)).ToListAsync(ct);

@@ -19,7 +19,9 @@ public sealed class PersonaConfiguration : IEntityTypeConfiguration<Persona>
         builder.Property(x => x.Nombres).HasMaxLength(100).IsRequired();
         builder.Property(x => x.Apellidos).HasMaxLength(100).IsRequired();
         builder.Property(x => x.Documento).HasMaxLength(30);
-        builder.HasIndex(x => x.Documento).IsUnique();
+        builder.HasIndex(x => new { x.TipoDocumentoId, x.Documento }).IsUnique();
+        builder.HasIndex(x => x.Documento).IsUnique().HasFilter("\"TipoDocumentoId\" IS NULL");
+        builder.HasOne(x => x.TipoDocumento).WithMany().HasForeignKey(x => x.TipoDocumentoId).OnDelete(DeleteBehavior.Restrict);
         builder.Property(x => x.Correo).HasMaxLength(254);
         builder.Property(x => x.Telefono).HasMaxLength(30);
         builder.Property(x => x.Direccion).HasMaxLength(300);

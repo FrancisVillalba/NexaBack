@@ -142,12 +142,12 @@ public sealed class ReportesRepository(UsuariosDbContext context) : IReportesRep
                 return ventas.Select(x => new { x.ClienteId, x.Total, Aplicado = context.Cobros.Where(c => c.VentaId == x.Id && c.Estado == "Vigente").Sum(c => (decimal?)c.Importe) ?? 0m })
                     .GroupBy(x => x.ClienteId).Select(g => new { Id = g.Key, Total = g.Sum(x => x.Total), Aplicado = g.Sum(x => x.Aplicado) })
                     .Where(x => x.Total > x.Aplicado).Join(context.Clientes.AsNoTracking(), x => x.Id, c => c.Id,
-                        (x, c) => new ReporteFilaDto { Id = c.Id, Referencia = c.Documento, Fecha = null, Nombre = c.NombreRazonSocial, Estado = c.Activo ? "Activo" : "Inactivo", Importe = x.Total, Aplicado = x.Aplicado, Saldo = x.Total - x.Aplicado, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
+                        (x, c) => new ReporteFilaDto { Id = c.Id, Referencia = c.TipoDocumento == null ? c.Documento : c.TipoDocumento.Nombre + " · " + c.Documento, Fecha = null, Nombre = c.NombreRazonSocial, Estado = c.Activo ? "Activo" : "Inactivo", Importe = x.Total, Aplicado = x.Aplicado, Saldo = x.Total - x.Aplicado, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
             case "por-pagar":
                 return compras.Select(x => new { x.ProveedorId, x.Total, Aplicado = context.Pagos.Where(p => p.CompraId == x.Id && p.Estado == "Vigente").Sum(p => (decimal?)p.Importe) ?? 0m })
                     .GroupBy(x => x.ProveedorId).Select(g => new { Id = g.Key, Total = g.Sum(x => x.Total), Aplicado = g.Sum(x => x.Aplicado) })
                     .Where(x => x.Total > x.Aplicado).Join(context.Proveedores.AsNoTracking(), x => x.Id, p => p.Id,
-                        (x, p) => new ReporteFilaDto { Id = p.Id, Referencia = p.Documento, Fecha = null, Nombre = p.NombreRazonSocial, Estado = p.Activo ? "Activo" : "Inactivo", Importe = x.Total, Aplicado = x.Aplicado, Saldo = x.Total - x.Aplicado, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
+                        (x, p) => new ReporteFilaDto { Id = p.Id, Referencia = p.TipoDocumento == null ? p.Documento : p.TipoDocumento.Nombre + " · " + p.Documento, Fecha = null, Nombre = p.NombreRazonSocial, Estado = p.Activo ? "Activo" : "Inactivo", Importe = x.Total, Aplicado = x.Aplicado, Saldo = x.Total - x.Aplicado, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
             default: throw new BusinessException("Tipo de reporte inválido.");
         }
     }

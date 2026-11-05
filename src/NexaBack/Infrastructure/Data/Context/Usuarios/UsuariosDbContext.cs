@@ -1,3 +1,5 @@
+using NexaBack.Infrastructure.Data.Context.TiposDocumento.Entity;
+using NexaBack.Infrastructure.Data.Context.TiposDocumento.Configurations;
 using NexaBack.Infrastructure.Data.Context.Presupuestos.Entity;
 using NexaBack.Infrastructure.Data.Context.Presupuestos.Configurations;
 using NexaBack.Infrastructure.Data.Context.Pagos.Entity;
@@ -24,6 +26,7 @@ namespace NexaBack.Infrastructure.Data.Context.Usuarios;
 /// <summary>Unidad de trabajo compartida: usuarios y catálogo usan la misma auditoría y transacción.</summary>
 public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> options, IUsuarioAuditoria usuarioAuditoria) : DbContext(options)
 {
+    public DbSet<TipoDocumento> TiposDocumento => Set<TipoDocumento>();
     public DbSet<Persona> Personas => Set<Persona>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<Perfil> Perfiles => Set<Perfil>();
@@ -48,6 +51,7 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("usuarios");
+        modelBuilder.ApplyConfiguration(new TipoDocumentoConfiguration());
         modelBuilder.ApplyConfiguration(new PresupuestoConfiguration());
         modelBuilder.ApplyConfiguration(new PresupuestoDetalleConfiguration());
         modelBuilder.ApplyConfiguration(new PagoConfiguration());

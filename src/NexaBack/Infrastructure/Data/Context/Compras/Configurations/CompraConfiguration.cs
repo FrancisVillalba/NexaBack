@@ -23,7 +23,7 @@ public sealed class CompraConfiguration : IEntityTypeConfiguration<Compra>
         b.HasIndex(x => new { x.Estado, x.CreadoEn });
         b.Property(x => x.SolicitudHash).HasMaxLength(64);
         b.Property(x => x.ProveedorNombre).HasMaxLength(301);
-        b.Property(x => x.ProveedorTipoDocumento).HasMaxLength(20);
+        b.Property(x => x.ProveedorTipoDocumento).HasMaxLength(100);
         b.Property(x => x.ProveedorDocumento).HasMaxLength(50);
         b.Property(x => x.DepositoNombre).HasMaxLength(100);
         b.Property(x => x.Estado).HasMaxLength(20);

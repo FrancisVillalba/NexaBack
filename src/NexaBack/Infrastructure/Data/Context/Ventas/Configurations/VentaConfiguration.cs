@@ -22,7 +22,7 @@ public sealed class VentaConfiguration : IEntityTypeConfiguration<Venta>
         b.HasIndex(x => new { x.Estado, x.CreadoEn });
         b.Property(x => x.SolicitudHash).HasMaxLength(64);
         b.Property(x => x.ClienteNombre).HasMaxLength(300);
-        b.Property(x => x.ClienteTipoDocumento).HasMaxLength(20);
+        b.Property(x => x.ClienteTipoDocumento).HasMaxLength(100);
         b.Property(x => x.ClienteDocumento).HasMaxLength(30);
         b.Property(x => x.DepositoNombre).HasMaxLength(100);
         b.Property(x => x.Estado).HasMaxLength(20);

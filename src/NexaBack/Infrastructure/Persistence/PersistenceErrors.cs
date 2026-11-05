@@ -25,7 +25,7 @@ internal static class PersistenceErrors
             exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
         {
             context.ChangeTracker.Clear();
-            throw new BusinessException("La persona o el perfil asociado ya no existe.", 409);
+            throw new BusinessException("El registro asociado ya no existe. Actualizá los datos y volvé a intentar.", 409);
         }
     }
 }

@@ -80,6 +80,9 @@ public static class AuthenticationSetup
             // Los catálogos y el cálculo sirven tanto para crear como para editar un presupuesto.
             options.AddPolicy("presupuestos.preparar", policy => policy.RequireAuthenticatedUser()
                 .RequireAssertion(ctx => ctx.User.HasClaim("acceso", "presupuestos.crear") || ctx.User.HasClaim("acceso", "presupuestos.editar")));
+            options.AddPolicy("tipos-documento.consultar", policy => policy.RequireAuthenticatedUser()
+                .RequireAssertion(ctx => new[] { "clientes.ver", "clientes.crear", "clientes.editar", "proveedores.ver", "proveedores.crear",
+                    "proveedores.editar", "personas.ver", "personas.crear", "personas.editar" }.Any(codigo => ctx.User.HasClaim("acceso", codigo))));
             foreach (var access in AccessCatalog.Definitions)
                 options.AddPolicy("acceso:" + access.Codigo, policy => policy.RequireAuthenticatedUser().AddRequirements(new AccessRequirement(access.Codigo)));
         });

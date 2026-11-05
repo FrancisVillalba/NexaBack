@@ -1,3 +1,4 @@
+using NexaBack.Infrastructure.Data.Context.TiposDocumento.Entity;
 using NexaBack.Infrastructure.Persistence;
 
 namespace NexaBack.Infrastructure.Data.Context.Comercial.Entity;
@@ -8,14 +9,13 @@ public sealed class Proveedor : IEntidadAuditable
     public int Id { get; set; }
     public required string NombreRazonSocial { get; set; }
     // Null identifica registros históricos que todavía no fueron clasificados.
-    public string? TipoDocumento { get; set; }
+    public int? TipoDocumentoId { get; set; }
+    public TipoDocumento? TipoDocumento { get; set; }
     public required string Documento { get; set; }
     public string? Correo { get; set; }
     public string? Telefono { get; set; }
     public string? Direccion { get; set; }
     public string? Observaciones { get; set; }
-    public int PlazoPagoDias { get; set; }
-    public decimal LimiteCredito { get; set; }
     public bool Activo { get; set; } = true;
     public Guid Version { get; set; } = Guid.NewGuid();
     public DateTime CreadoEn { get; set; }

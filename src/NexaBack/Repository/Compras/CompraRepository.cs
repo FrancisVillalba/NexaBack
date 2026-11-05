@@ -45,7 +45,7 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
                     throw new BusinessException("El identificador de operación ya se utilizó con otros datos.", 409);
                 return Map(anterior);
             }
-            var proveedor = await context.Proveedores.SingleOrDefaultAsync(x => x.Id == request.ProveedorId, ct);
+            var proveedor = await context.Proveedores.Include(x => x.TipoDocumento).SingleOrDefaultAsync(x => x.Id == request.ProveedorId, ct);
             if (proveedor is null || !proveedor.Activo) throw new BusinessException("El proveedor no existe o está inactivo.");
             var deposito = await context.Depositos.SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
             if (deposito is null || !deposito.Activo) throw new BusinessException("El depósito no existe o está inactivo.");
@@ -54,7 +54,7 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
             var compra = new Compra {
                 OperacionId = request.OperacionId, SolicitudHash = solicitudHash, ProveedorId = proveedor.Id,
                 ProveedorNombre = proveedor.NombreRazonSocial,
-                ProveedorTipoDocumento = proveedor.TipoDocumento, ProveedorDocumento = proveedor.Documento, DepositoId = deposito.Id, DepositoNombre = deposito.Nombre,
+                ProveedorTipoDocumento = proveedor.TipoDocumento == null ? null : proveedor.TipoDocumento.Nombre, ProveedorDocumento = proveedor.Documento, DepositoId = deposito.Id, DepositoNombre = deposito.Nombre,
                 Observaciones = request.Observaciones
             };
             foreach (var item in request.Items)
@@ -81,7 +81,7 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
             if (compra.Estado == "Recibida") return Map(compra);
             CompraReglas.ValidarVersion(compra.Version, version);
             if (compra.Estado != "Pendiente") throw new BusinessException("Solo se reciben compras pendientes.", 409);
-            var proveedor = await context.Proveedores.SingleAsync(x => x.Id == compra.ProveedorId, ct);
+            var proveedor = await context.Proveedores.Include(x => x.TipoDocumento).SingleAsync(x => x.Id == compra.ProveedorId, ct);
             if (!proveedor.Activo) throw new BusinessException("El proveedor está inactivo.");
             var deposito = await context.Depositos.SingleAsync(x => x.Id == compra.DepositoId, ct);
             if (!deposito.Activo) throw new BusinessException("El depósito está inactivo.");
@@ -139,7 +139,7 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
         return await context.Proveedores.AsNoTracking().Where(x => x.Activo
             && (EF.Functions.ILike(x.NombreRazonSocial, patron, "\\") || EF.Functions.ILike(x.Documento ?? "", patron, "\\")))
             .OrderBy(x => x.NombreRazonSocial).ThenBy(x => x.Id).Take(20)
-            .Select(x => new CompraProveedorDto(x.Id, x.NombreRazonSocial, x.TipoDocumento, x.Documento)).ToListAsync(ct);
+            .Select(x => new CompraProveedorDto(x.Id, x.NombreRazonSocial, x.TipoDocumento == null ? null : x.TipoDocumento.Nombre, x.Documento)).ToListAsync(ct);
     }
     public async Task<IReadOnlyList<CompraProductoDto>> ProductosAsync(string buscar, CancellationToken ct)
     {

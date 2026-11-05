@@ -1,3 +1,5 @@
+using NexaBack.Repository.TiposDocumento;
+using NexaBack.Services.TiposDocumento;
 using NexaBack.Repository.Reportes;
 using NexaBack.Services.Reportes;
 using NexaBack.Repository.Presupuestos;
@@ -76,6 +78,8 @@ public static class DependencyInjection
         services.AddScoped<IPresupuestoService, PresupuestoService>();
         services.AddScoped<IReportesRepository, ReportesRepository>();
         services.AddScoped<IReportesService, ReportesService>();
+        services.AddScoped<ITipoDocumentoRepository, TipoDocumentoRepository>();
+        services.AddScoped<ITipoDocumentoService, TipoDocumentoService>();
         return services;
     }
 }

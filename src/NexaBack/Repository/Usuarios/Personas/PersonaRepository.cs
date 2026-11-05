@@ -14,7 +14,7 @@ public sealed class PersonaRepository(UsuariosDbContext context) : IPersonaRepos
         string? buscar = null, bool? activo = null, CancellationToken cancellationToken = default)
     {
         // IQueryable arma una consulta SQL: se filtra y pagina en PostgreSQL, no en memoria.
-        var query = context.Personas.AsNoTracking();
+        var query = context.Personas.AsNoTracking().Include(x => x.TipoDocumento).AsQueryable();
         if (activo.HasValue) query = query.Where(x => x.Activo == activo.Value);
         if (!string.IsNullOrEmpty(buscar))
         {
@@ -29,14 +29,14 @@ public sealed class PersonaRepository(UsuariosDbContext context) : IPersonaRepos
     }
 
     public Task<Persona?> ObtenerAsync(int id, CancellationToken cancellationToken = default)
-        => context.Personas.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        => context.Personas.AsNoTracking().Include(x => x.TipoDocumento).SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
     public Task<Persona?> ObtenerParaActualizarAsync(int id, CancellationToken cancellationToken = default)
         // Sin AsNoTracking, EF detecta qué propiedades cambiaron al guardar.
-        => context.Personas.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        => context.Personas.Include(x => x.TipoDocumento).SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
-    public Task<bool> ExisteDocumentoAsync(string value, CancellationToken cancellationToken = default, int? excluirId = null)
-        => context.Personas.AnyAsync(x => x.Documento == value && x.Id != excluirId, cancellationToken);
+    public Task<bool> ExisteDocumentoAsync(int tipoDocumentoId, string value, CancellationToken cancellationToken = default, int? excluirId = null)
+        => context.Personas.AnyAsync(x => x.Documento == value && (x.TipoDocumentoId == tipoDocumentoId || x.TipoDocumentoId == null) && x.Id != excluirId, cancellationToken);
 
     public async Task AgregarAsync(Persona entity, CancellationToken cancellationToken = default)
     {

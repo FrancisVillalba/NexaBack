@@ -11,7 +11,7 @@ public sealed class ClienteRepository(UsuariosDbContext context) : IClienteRepos
 {
     public async Task<(IReadOnlyList<Cliente> Items, int Total)> ListarAsync(int offset, int limite, string? buscar, bool? activo, CancellationToken ct)
     {
-        var query = context.Clientes.AsNoTracking();
+        var query = context.Clientes.AsNoTracking().Include(x => x.TipoDocumento).AsQueryable();
         if (activo.HasValue) query = query.Where(x => x.Activo == activo.Value);
         if (!string.IsNullOrEmpty(buscar))
         {
@@ -24,9 +24,9 @@ public sealed class ClienteRepository(UsuariosDbContext context) : IClienteRepos
         return (await query.OrderBy(x => x.NombreRazonSocial).ThenBy(x => x.Id).Skip(offset).Take(limite).ToListAsync(ct), total);
     }
     public Task<Cliente?> ObtenerAsync(int id, bool paraActualizar, CancellationToken ct)
-        => (paraActualizar ? context.Clientes : context.Clientes.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id, ct);
-    public Task<bool> ExisteDocumentoAsync(string tipoDocumento, string documento, CancellationToken ct, int? excluirId = null)
-        => context.Clientes.AnyAsync(x => x.Documento == documento && (x.TipoDocumento == tipoDocumento || x.TipoDocumento == null) && (!excluirId.HasValue || x.Id != excluirId.Value), ct);
+        => (paraActualizar ? context.Clientes : context.Clientes.AsNoTracking()).Include(x => x.TipoDocumento).SingleOrDefaultAsync(x => x.Id == id, ct);
+    public Task<bool> ExisteDocumentoAsync(int tipoDocumentoId, string documento, CancellationToken ct, int? excluirId = null)
+        => context.Clientes.AnyAsync(x => x.Documento == documento && (x.TipoDocumentoId == tipoDocumentoId || x.TipoDocumentoId == null) && (!excluirId.HasValue || x.Id != excluirId.Value), ct);
     public async Task AgregarAsync(Cliente contacto, CancellationToken ct)
     {
         context.Clientes.Add(contacto);

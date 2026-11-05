@@ -1,3 +1,4 @@
+using NexaBack.Services.TiposDocumento;
 using NexaBack.Common;
 using NexaBack.Infrastructure.Data.Context.Comercial.Entity;
 using NexaBack.Infrastructure.Data.Dtos.Comercial;
@@ -6,7 +7,7 @@ using NexaBack.Repository.Clientes;
 namespace NexaBack.Services.Clientes;
 
 // El nombre o razón social admite tanto particulares como empresas, sin exigir apellidos.
-public sealed class ClienteService(IClienteRepository repository) : IClienteService
+public sealed class ClienteService(IClienteRepository repository, ITipoDocumentoService tipos) : IClienteService
 {
     public async Task<ContactosPaginaDto> ListarAsync(int pagina, int tamanoPagina, string? buscar, bool? activo, CancellationToken ct)
     {
@@ -18,9 +19,11 @@ public sealed class ClienteService(IClienteRepository repository) : IClienteServ
     public async Task<ContactoComercialDto> CrearAsync(GuardarContactoRequest request, CancellationToken ct)
     {
         var datos = Validar(request);
-        await ValidarDocumentoAsync(datos.TipoDocumento, datos.Documento, null, ct);
+        var tipo = await tipos.ValidarAsync(datos.TipoDocumentoId, null, ct);
+        await ValidarDocumentoAsync(datos.TipoDocumentoId, datos.Documento, null, ct);
         var contacto = new Cliente { NombreRazonSocial = datos.NombreRazonSocial, Documento = datos.Documento };
         Aplicar(contacto, datos);
+        contacto.TipoDocumento = tipo;
         await repository.AgregarAsync(contacto, ct);
         return Map(contacto);
     }
@@ -29,9 +32,11 @@ public sealed class ClienteService(IClienteRepository repository) : IClienteServ
         var datos = Validar(request);
         var contacto = await ObtenerEntidadAsync(id, true, ct);
         ValidarVersion(contacto, datos.Version);
-        await ValidarDocumentoAsync(datos.TipoDocumento, datos.Documento, id, ct);
+        var tipo = await tipos.ValidarAsync(datos.TipoDocumentoId, contacto.TipoDocumentoId, ct);
+        await ValidarDocumentoAsync(datos.TipoDocumentoId, datos.Documento, id, ct);
         // Editar un cliente/proveedor no modifica ninguna Persona ni el otro módulo.
         Aplicar(contacto, datos);
+        contacto.TipoDocumento = tipo;
         contacto.Version = Guid.NewGuid();
         await repository.GuardarCambiosAsync(ct);
         return Map(contacto);
@@ -45,9 +50,9 @@ public sealed class ClienteService(IClienteRepository repository) : IClienteServ
         contacto.Version = Guid.NewGuid();
         await repository.GuardarCambiosAsync(ct);
     }
-    private async Task ValidarDocumentoAsync(string tipoDocumento, string documento, int? excluirId, CancellationToken ct)
+    private async Task ValidarDocumentoAsync(int tipoDocumentoId, string documento, int? excluirId, CancellationToken ct)
     {
-        if (await repository.ExisteDocumentoAsync(tipoDocumento, documento, ct, excluirId))
+        if (await repository.ExisteDocumentoAsync(tipoDocumentoId, documento, ct, excluirId))
             throw new BusinessException("Ya existe un cliente con ese tipo y número de documento, o uno anterior sin tipo definido. Editá o reactivá el registro existente.", 409);
     }
     private async Task<Cliente> ObtenerEntidadAsync(int id, bool actualizar, CancellationToken ct)
@@ -66,16 +71,14 @@ public sealed class ClienteService(IClienteRepository repository) : IClienteServ
     private static void Aplicar(Cliente contacto, GuardarContactoRequest datos)
     {
         contacto.NombreRazonSocial = datos.NombreRazonSocial;
-        contacto.TipoDocumento = datos.TipoDocumento;
+        contacto.TipoDocumentoId = datos.TipoDocumentoId;
         contacto.Documento = datos.Documento;
         contacto.Correo = datos.Correo;
         contacto.Telefono = datos.Telefono;
         contacto.Direccion = datos.Direccion;
         contacto.Observaciones = datos.Observaciones;
-        contacto.PlazoPagoDias = datos.PlazoPagoDias;
-        contacto.LimiteCredito = datos.LimiteCredito;
     }
-    private static ContactoComercialDto Map(Cliente x) => new(x.Id, x.NombreRazonSocial, x.TipoDocumento, x.Documento, x.Correo,
-        x.Telefono, x.Direccion, x.Observaciones, x.PlazoPagoDias, x.LimiteCredito, x.Activo, x.Version,
+    private static ContactoComercialDto Map(Cliente x) => new(x.Id, x.NombreRazonSocial, x.TipoDocumentoId, x.TipoDocumento?.Nombre, x.Documento, x.Correo,
+        x.Telefono, x.Direccion, x.Observaciones, x.Activo, x.Version,
         x.CreadoEn, x.CreadoPor, x.ModificadoEn, x.ModificadoPor);
 }
