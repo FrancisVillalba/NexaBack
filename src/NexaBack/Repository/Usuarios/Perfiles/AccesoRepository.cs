@@ -25,7 +25,7 @@ public sealed class AccesoRepository(UsuariosDbContext context) : IAccesoReposit
         return await context.PerfilesAccesos.AsNoTracking()
             .Where(x => x.PerfilId == perfilId && x.Acceso.Activo && x.Perfil.Activo)
             .Where(x => x.Acceso.Modulo != "personas" && x.Acceso.Modulo != "usuarios"
-                && x.Acceso.Modulo != "perfiles" && x.Acceso.Modulo != "permisos" && x.Acceso.Modulo != "configuracion" && x.Acceso.Modulo != "depositos" && x.Acceso.Modulo != "marcas")
+                && x.Acceso.Modulo != "perfiles" && x.Acceso.Modulo != "permisos" && x.Acceso.Modulo != "configuracion" && x.Acceso.Modulo != "depositos" && x.Acceso.Modulo != "marcas" && x.Acceso.Modulo != "categorias")
             .Select(x => x.Acceso.Codigo).OrderBy(x => x).ToArrayAsync(ct);
     }
 

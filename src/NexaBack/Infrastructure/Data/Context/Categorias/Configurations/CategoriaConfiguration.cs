@@ -11,6 +11,8 @@ public sealed class CategoriaConfiguration : IEntityTypeConfiguration<Categoria>
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).UseIdentityByDefaultColumn();
         b.Property(x => x.Nombre).HasMaxLength(100).IsRequired();
+        b.Property(x => x.Descripcion).HasMaxLength(300);
+        b.Property(x => x.Version).HasDefaultValueSql("gen_random_uuid()").IsConcurrencyToken();
         b.Property<string>("NombreNormalizado").HasComputedColumnSql("lower(btrim(\"Nombre\"))", stored: true);
         b.HasIndex("NombreNormalizado").IsUnique();
         b.Property(x => x.Activo).HasDefaultValue(true);

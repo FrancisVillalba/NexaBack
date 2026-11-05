@@ -329,4 +329,14 @@ Ejecutar manualmente `back/src/NexaBack/Infrastructure/Persistence/Sql/018_Categ
 - No hay valores de respaldo locales. Una consulta fallida o una selección inválida bloquea el guardado. Una opción inactiva solo puede conservarse en el producto que ya la tenía.
 - La unidad no se puede cambiar si el producto tiene movimientos de stock. Metro y kilo admiten fracciones; las demás unidades requieren cantidades enteras. Compras, ventas, presupuestos, inventario y reportes consultan las nuevas relaciones; los comprobantes conservan sus unidades históricas.
 
-Este cambio agrega tablas y selectores, sin un ABM de mantenimiento de estos dos catálogos. Las categorías nuevas se cargan en `catalogo.categorias` (hay un ejemplo comentado al final del SQL). Si no existían productos, el catálogo de categorías queda vacío hasta cargar las categorías reales del negocio. Reiniciar el backend y recargar el frontend después de aplicar el SQL.
+El mantenimiento de Categorías se realiza desde Administración → Categorías después de aplicar el script 019. Unidades de medida conserva por ahora únicamente su tabla y selector. Si no existían productos, el catálogo de categorías queda vacío hasta cargar las categorías reales del negocio desde su ABM. Reiniciar el backend y recargar el frontend después de aplicar el SQL.
+
+## ABM de Categorías
+
+Ejecutar manualmente `back/src/NexaBack/Infrastructure/Persistence/Sql/019_Abm_Categorias.sql` después del 018, con el backend detenido. Amplía la misma tabla `catalogo.categorias` con descripción opcional y versión de concurrencia; conserva IDs, productos y auditoría. No carga categorías de ejemplo.
+
+Administración → Categorías permite crear, editar, buscar por nombre o descripción, filtrar por estado y activar/desactivar. El nombre es obligatorio (100 caracteres), la descripción admite 300 y los nombres no se pueden repetir, incluso entre inactivos. La baja es lógica. Editar o cambiar el estado requiere la versión consultada para evitar sobrescribir cambios ajenos.
+
+El mantenimiento usa `/api/categorias` y permisos `categorias.ver`, `categorias.crear`, `categorias.editar`, `categorias.estado`, restringidos al administrador. Reiniciar el backend, volver a iniciar sesión para cargar los permisos y recargar el frontend después de ejecutar el SQL. El operador conserva la consulta del selector mediante los permisos de Productos; no recibe acceso administrativo.
+
+El selector de Productos se actualiza al abrir el formulario, recuperar el foco o recibir una confirmación de cambio del ABM. Una categoría inactiva puede conservarse en un producto existente, pero no asignarse a uno nuevo. Renombrar una categoría actualiza su etiqueta en los productos asociados sin cambiar sus IDs.

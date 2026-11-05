@@ -8,7 +8,7 @@ public static class AccessCatalog
     // no inventa permisos que ningún endpoint o botón pueda interpretar.
     public static readonly IReadOnlyList<AccessDefinition> Definitions = Build();
     public static readonly string[] OperatorModules = ["clientes", "proveedores", "productos", "inventario", "compras", "ventas", "presupuestos"];
-    public static bool IsAdministrative(string module) => module is "personas" or "usuarios" or "perfiles" or "permisos" or "configuracion" or "depositos" or "marcas";
+    public static bool IsAdministrative(string module) => module is "personas" or "usuarios" or "perfiles" or "permisos" or "configuracion" or "depositos" or "marcas" or "categorias";
 
     private static IReadOnlyList<AccessDefinition> Build()
     {
@@ -32,6 +32,7 @@ public static class AccessCatalog
         Add("reportes", "ver", "exportar"); Add("configuracion", "ver", "editar", "restablecer");
         Add("personas", "ver", "crear", "editar", "estado"); Add("usuarios", "ver", "crear", "editar", "estado", "password");
         Add("perfiles", "ver", "crear", "editar", "estado"); Add("permisos", "ver", "editar");
+        Add("categorias", "ver", "crear", "editar", "estado");
         Add("marcas", "ver", "crear", "editar", "estado");
         Add("depositos", "ver", "crear", "editar", "estado");
         return result;
