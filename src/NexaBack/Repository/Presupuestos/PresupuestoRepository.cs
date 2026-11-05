@@ -39,15 +39,15 @@ public sealed class PresupuestoRepository(UsuariosDbContext context, IVentaRepos
         var deposito = await context.Depositos.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
         if (deposito is null || !deposito.Activo) throw new BusinessException("El depósito no existe o está inactivo.");
         var ids = request.Items.Select(x => x.ProductoId).ToArray();
-        var productos = await context.Productos.AsNoTracking().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        var productos = await context.Productos.AsNoTracking().Include(x => x.UnidadMedidaCatalogo).Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
         var saldos = await context.Existencias.AsNoTracking().Where(x => x.DepositoId == request.DepositoId && ids.Contains(x.ProductoId)).ToDictionaryAsync(x => x.ProductoId, ct);
         var lineas = new List<VentaCotizacionLinea>();
         foreach (var item in request.Items.OrderBy(x => x.ProductoId))
         {
             if (!productos.TryGetValue(item.ProductoId, out var producto) || !producto.Activo) throw new BusinessException("Un producto no existe o está inactivo.");
             // Presupuestar admite cantidades superiores al stock; no reserva ni genera salidas.
-            var subtotal = VentaReglas.Subtotal(item.Cantidad, producto.PrecioVenta, producto.UnidadMedida);
-            lineas.Add(new(producto.Id, producto.Codigo, producto.Nombre, producto.UnidadMedida, item.Cantidad, producto.PrecioVenta, subtotal,
+            var subtotal = VentaReglas.Subtotal(item.Cantidad, producto.PrecioVenta, producto.UnidadMedidaCatalogo.Codigo);
+            lineas.Add(new(producto.Id, producto.Codigo, producto.Nombre, producto.UnidadMedidaCatalogo.Codigo, item.Cantidad, producto.PrecioVenta, subtotal,
                 saldos.TryGetValue(producto.Id, out var saldo) ? saldo.Cantidad : 0, producto.Version));
         }
         var suma = lineas.Sum(x => x.Subtotal);

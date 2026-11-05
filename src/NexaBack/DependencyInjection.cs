@@ -1,3 +1,9 @@
+using NexaBack.Repository.Categorias;
+using NexaBack.Services.Categorias;
+using NexaBack.Repository.UnidadesMedida;
+using NexaBack.Services.UnidadesMedida;
+using NexaBack.Repository.Marcas;
+using NexaBack.Services.Marcas;
 using NexaBack.Repository.TiposDocumento;
 using NexaBack.Services.TiposDocumento;
 using NexaBack.Repository.Reportes;
@@ -80,6 +86,12 @@ public static class DependencyInjection
         services.AddScoped<IReportesService, ReportesService>();
         services.AddScoped<ITipoDocumentoRepository, TipoDocumentoRepository>();
         services.AddScoped<ITipoDocumentoService, TipoDocumentoService>();
+        services.AddScoped<IMarcaRepository, MarcaRepository>();
+        services.AddScoped<IMarcaService, MarcaService>();
+        services.AddScoped<ICategoriaRepository, CategoriaRepository>();
+        services.AddScoped<ICategoriaService, CategoriaService>();
+        services.AddScoped<IUnidadMedidaRepository, UnidadMedidaRepository>();
+        services.AddScoped<IUnidadMedidaService, UnidadMedidaService>();
         return services;
     }
 }

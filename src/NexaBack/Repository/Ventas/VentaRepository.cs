@@ -40,16 +40,16 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
         var deposito = await context.Depositos.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
         if (deposito is null || !deposito.Activo) throw new BusinessException("El depósito no existe o está inactivo.");
         var ids = request.Items.Select(x => x.ProductoId).ToArray();
-        var productos = await context.Productos.AsNoTracking().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        var productos = await context.Productos.AsNoTracking().Include(x => x.UnidadMedidaCatalogo).Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
         var saldos = await context.Existencias.AsNoTracking().Where(x => x.DepositoId == request.DepositoId && ids.Contains(x.ProductoId)).ToDictionaryAsync(x => x.ProductoId, ct);
         var lineas = new List<VentaCotizacionLinea>();
         foreach (var item in request.Items.OrderBy(x => x.ProductoId))
         {
             if (!productos.TryGetValue(item.ProductoId, out var producto) || !producto.Activo) throw new BusinessException("Un producto no existe o está inactivo.");
             var disponible = saldos.TryGetValue(item.ProductoId, out var saldo) ? saldo.Cantidad : 0;
-            InventarioReglas.Calcular("salida", item.Cantidad, disponible, null, producto.UnidadMedida);
-            var subtotal = VentaReglas.Subtotal(item.Cantidad, producto.PrecioVenta, producto.UnidadMedida);
-            lineas.Add(new(producto.Id, producto.Codigo, producto.Nombre, producto.UnidadMedida, item.Cantidad,
+            InventarioReglas.Calcular("salida", item.Cantidad, disponible, null, producto.UnidadMedidaCatalogo.Codigo);
+            var subtotal = VentaReglas.Subtotal(item.Cantidad, producto.PrecioVenta, producto.UnidadMedidaCatalogo.Codigo);
+            lineas.Add(new(producto.Id, producto.Codigo, producto.Nombre, producto.UnidadMedidaCatalogo.Codigo, item.Cantidad,
                 producto.PrecioVenta, subtotal, disponible, producto.Version));
         }
         var suma = lineas.Sum(x => x.Subtotal);
@@ -91,7 +91,7 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
             var deposito = await context.Depositos.SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
             if (deposito is null || !deposito.Activo) throw new BusinessException("El depósito no existe o está inactivo.");
             var ids = request.Items.Select(x => x.ProductoId).ToArray();
-            var productos = await context.Productos.Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+            var productos = await context.Productos.Include(x => x.UnidadMedidaCatalogo).Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
             var saldos = await context.Existencias.Where(x => x.DepositoId == request.DepositoId && ids.Contains(x.ProductoId)).ToDictionaryAsync(x => x.ProductoId, ct);
             var venta = new Venta { OperacionId = request.OperacionId, SolicitudHash = hash, ClienteId = cliente.Id,
                 ClienteNombre = cliente.NombreRazonSocial, ClienteTipoDocumento = cliente.TipoDocumento == null ? null : cliente.TipoDocumento.Nombre, ClienteDocumento = cliente.Documento,
@@ -101,15 +101,15 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
                 if (!productos.TryGetValue(item.ProductoId, out var producto) || !producto.Activo) throw new BusinessException("Un producto no existe o está inactivo.");
                 if (producto.Version != item.VersionProducto) throw new BusinessException("Cambió el precio, estado o stock de un producto. Volvé a calcular el total y revisalo antes de confirmar.", 409);
                 if (!saldos.TryGetValue(item.ProductoId, out var saldo)) throw new BusinessException("No hay existencias para un producto.", 409);
-                var (nuevo, _) = InventarioReglas.Calcular("salida", item.Cantidad, saldo.Cantidad, null, producto.UnidadMedida);
-                var subtotal = VentaReglas.Subtotal(item.Cantidad, producto.PrecioVenta, producto.UnidadMedida);
+                var (nuevo, _) = InventarioReglas.Calcular("salida", item.Cantidad, saldo.Cantidad, null, producto.UnidadMedidaCatalogo.Codigo);
+                var subtotal = VentaReglas.Subtotal(item.Cantidad, producto.PrecioVenta, producto.UnidadMedidaCatalogo.Codigo);
                 var movimiento = new MovimientoInventario { OperacionId = Guid.NewGuid(), ProductoId = producto.Id, DepositoId = deposito.Id,
                     Tipo = "salida", Cantidad = item.Cantidad, Variacion = -item.Cantidad, StockAnterior = saldo.Cantidad, StockPosterior = nuevo,
                     Motivo = "Venta (operación " + request.OperacionId + ")" };
                 // La salida, el saldo y la venta se persisten juntos. El detalle referencia el movimiento.
                 context.MovimientosInventario.Add(movimiento);
                 venta.Detalles.Add(new VentaDetalle { ProductoId = producto.Id, ProductoCodigo = producto.Codigo,
-                    ProductoNombre = producto.Nombre, UnidadMedida = producto.UnidadMedida, Cantidad = item.Cantidad,
+                    ProductoNombre = producto.Nombre, UnidadMedida = producto.UnidadMedidaCatalogo.Codigo, Cantidad = item.Cantidad,
                     PrecioUnitario = producto.PrecioVenta, CostoUnitario = producto.Costo, Subtotal = subtotal, MovimientoSalida = movimiento });
                 venta.Subtotal += subtotal;
                 saldo.Cantidad = nuevo;
@@ -141,12 +141,12 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
             var deposito = await context.Depositos.SingleAsync(x => x.Id == venta.DepositoId, ct);
             if (!deposito.Activo) throw new BusinessException("Reactivá el depósito original antes de devolverle las existencias.", 409);
             var ids = venta.Detalles.Select(x => x.ProductoId).ToArray();
-            var productos = await context.Productos.Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+            var productos = await context.Productos.Include(x => x.UnidadMedidaCatalogo).Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
             var saldos = await context.Existencias.Where(x => x.DepositoId == venta.DepositoId && ids.Contains(x.ProductoId)).ToDictionaryAsync(x => x.ProductoId, ct);
             foreach (var item in venta.Detalles.OrderBy(x => x.ProductoId))
             {
                 if (item.MovimientoAnulacionId is not null) throw new BusinessException("La línea ya tiene una devolución asociada.", 409);
-                if (!productos.TryGetValue(item.ProductoId, out var producto) || producto.UnidadMedida != item.UnidadMedida)
+                if (!productos.TryGetValue(item.ProductoId, out var producto) || producto.UnidadMedidaCatalogo.Codigo != item.UnidadMedida)
                     throw new BusinessException("El producto no existe o cambió de unidad. Revisá el inventario.", 409);
                 // Una anulación devuelve los artículos originales, aunque el producto o cliente ya esté inactivo.
                 if (!saldos.TryGetValue(item.ProductoId, out var saldo))
@@ -184,9 +184,9 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
     {
         if (!await context.Depositos.AnyAsync(x => x.Id == depositoId && x.Activo, ct)) throw new BusinessException("Depósito no encontrado o inactivo.");
         var patron = Patron(buscar);
-        return await context.Productos.AsNoTracking().Where(x => x.Activo && (EF.Functions.ILike(x.Nombre, patron, "\\")
+        return await context.Productos.AsNoTracking().Include(x => x.UnidadMedidaCatalogo).Where(x => x.Activo && (EF.Functions.ILike(x.Nombre, patron, "\\")
             || EF.Functions.ILike(x.Codigo, patron, "\\") || EF.Functions.ILike(x.CodigoBarras ?? "", patron, "\\")))
-            .OrderBy(x => x.Nombre).ThenBy(x => x.Id).Take(20).Select(x => new VentaProductoDto(x.Id, x.Codigo, x.Nombre, x.UnidadMedida, x.PrecioVenta,
+            .OrderBy(x => x.Nombre).ThenBy(x => x.Id).Take(20).Select(x => new VentaProductoDto(x.Id, x.Codigo, x.Nombre, x.UnidadMedidaCatalogo.Codigo, x.PrecioVenta,
                 context.Existencias.Where(e => e.DepositoId == depositoId && e.ProductoId == x.Id).Select(e => (decimal?)e.Cantidad).FirstOrDefault() ?? 0m)).ToListAsync(ct);
     }
     private int Usuario() => context.UsuarioAuditoriaId ?? throw new BusinessException("Se requiere una sesión válida.", 401);

@@ -298,3 +298,35 @@ El front comparte tiposDocumentoServicio.ts, tiposDocumentoEstado.ts, tiposDocum
 Ejecutar manualmente 016_Quitar_Condiciones_Comerciales.sql con el backend detenido, después de los scripts anteriores hasta 015. Elimina PlazoPagoDias y LimiteCredito de comercial.clientes y comercial.proveedores y sus restricciones. No conserva ni traslada sus valores a comprobantes. No usa CASCADE ni modifica operaciones, inventario o cuentas corrientes. Reiniciar el backend y recargar el front.
 
 Los formularios, listados, contratos, entidades, validaciones y catálogos del frontend ya no contienen plazo de pago o límite de crédito. Observaciones permanece disponible. Las condiciones de pago por factura quedan pendientes de implementación; este cambio no agrega campos ni reglas a Ventas/Compras.
+
+## ABM de Marcas y relación con Productos
+
+Ejecutar manualmente 017_Marcas.sql, ubicado en back/src/NexaBack/Infrastructure/Persistence/Sql, con el backend detenido y después de los scripts anteriores hasta 016. Crea catalogo.marcas con Nombre, Descripcion, Activo, Version y auditoría de creación/modificación. No crea marcas de demostración. La migración obtiene las marcas que ya existían como texto en los productos, agrupa por nombre sin distinguir mayúsculas ni espacios extremos y las asocia mediante MarcaId. Los productos sin marca conservan NULL.
+
+El nombre es obligatorio, hasta 100 caracteres. La descripción es opcional, hasta 300. Una columna calculada NombreNormalizado e índice único en PostgreSQL impiden duplicados, incluso ante solicitudes simultáneas o marcas inactivas. Las versiones protegen ediciones y cambios de estado. La auditoría usa el mismo UsuariosDbContext que los demás módulos.
+
+Administración > Marcas permite buscar, filtrar por estado, paginar, crear, editar, activar y desactivar. Es un catálogo administrativo, con permisos marcas.ver/crear/editar/estado y rol Administrador en sus endpoints. El script incorpora el catálogo de permisos, sin asignaciones nuevas a perfiles. Reiniciar backend y renovar la sesión después del SQL. Los perfiles no administrativos no obtienen permisos de mantenimiento de Marcas.
+
+Productos reemplaza el campo de texto por un selector. Guarda MarcaId y devuelve Marca como nombre de lectura obtenido por JOIN. La marca sigue siendo opcional: Sin marca guarda NULL. Se pueden elegir marcas activas; al editar, también se puede conservar la marca actual aunque esté inactiva. No se permite asignar una marca inactiva a un producto nuevo ni cambiar hacia otra inactiva. Desactivar una marca no desactiva ni desvincula sus productos.
+
+GET /api/productos/marcas entrega opciones mínimas paginadas (Id, Nombre, Activo) con permisos de consulta/alta/edición de Productos. El selector recorre todas las páginas y no requiere permisos administrativos ni auditoría de Marcas. Al volver a la ventana o actualizar el catálogo, consulta la API nuevamente; no hay nombres fijos ni datos del template como alternativa ante errores.
+
+El listado de Productos mantiene la búsqueda por nombre de marca y muestra la descripción de la relación. La FK restrictiva impide borrar una marca usada. El ABM realiza baja lógica; no ofrece eliminación física. No modifica códigos de productos, cantidades, costos, precios, movimientos ni comprobantes.
+
+El SQL comprueba la correspondencia antes de quitar el texto antiguo. Si encuentra IDs contradictorios o dependencias externas, revierte para revisión manual; no utiliza CASCADE. Una marca existente no se reemplaza si su nombre normalizado ya coincide. Las operaciones conservan sus datos históricos.
+
+El backend mantiene IMarcaRepository/MarcaRepository e IMarcaService/MarcaService. El front usa marcasListado.tsx, marcasEdicion.tsx, marcasEstado.tsx, marcasServicio.ts, marcasTipos.ts y marcasCatalogo.ts, con comentarios en español.
+
+## Categorías y unidades de medida de Productos
+
+Ejecutar manualmente `back/src/NexaBack/Infrastructure/Persistence/Sql/018_Categorias_UnidadesMedida.sql` después del script 017 de Marcas, con el backend detenido. El archivo SQL no se ejecuta desde la aplicación.
+
+- `catalogo.categorias` reúne las categorías actuales, ignorando diferencias de mayúsculas y espacios exteriores.
+- `catalogo.unidades_medida` contiene las seis unidades que ya admite el sistema: unidad, caja, metro, kilo, bolsa y par. El código técnico es estable para conservar las reglas de cantidades y los comprobantes históricos; el nombre es la etiqueta visible.
+- Productos guarda `CategoriaId` y `UnidadMedidaId` obligatorios, con claves foráneas y borrado restringido. Los textos originales se eliminan después de migrar las relaciones.
+- Ambas tablas tienen fecha y usuario de creación y modificación. Los registros iniciales del script quedan sin usuario porque se crean mediante una migración manual.
+- El formulario consulta `GET /api/productos/categorias` y `GET /api/productos/unidades-medida`, con los permisos existentes de consultar, crear o editar productos. Los selectores recorren todas las páginas y cargan automáticamente al abrir el formulario o volver a la ventana.
+- No hay valores de respaldo locales. Una consulta fallida o una selección inválida bloquea el guardado. Una opción inactiva solo puede conservarse en el producto que ya la tenía.
+- La unidad no se puede cambiar si el producto tiene movimientos de stock. Metro y kilo admiten fracciones; las demás unidades requieren cantidades enteras. Compras, ventas, presupuestos, inventario y reportes consultan las nuevas relaciones; los comprobantes conservan sus unidades históricas.
+
+Este cambio agrega tablas y selectores, sin un ABM de mantenimiento de estos dos catálogos. Las categorías nuevas se cargan en `catalogo.categorias` (hay un ejemplo comentado al final del SQL). Si no existían productos, el catálogo de categorías queda vacío hasta cargar las categorías reales del negocio. Reiniciar el backend y recargar el frontend después de aplicar el SQL.

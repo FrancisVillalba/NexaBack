@@ -24,7 +24,7 @@ public sealed class InventarioRepository(UsuariosDbContext context) : IInventari
         {
             var patron = Patron(buscar);
             productos = productos.Where(x => EF.Functions.ILike(x.Codigo, patron, "\\") || EF.Functions.ILike(x.Nombre, patron, "\\")
-                || EF.Functions.ILike(x.Categoria, patron, "\\") || EF.Functions.ILike(x.CodigoBarras ?? "", patron, "\\"));
+                || EF.Functions.ILike(x.CategoriaCatalogo.Nombre, patron, "\\") || EF.Functions.ILike(x.CodigoBarras ?? "", patron, "\\"));
         }
         // Un producto nuevo también aparece: sin movimientos, su existencia es cero.
         var query = productos.Select(p => new
@@ -42,8 +42,8 @@ public sealed class InventarioRepository(UsuariosDbContext context) : IInventari
         };
         var total = await query.CountAsync(ct);
         var items = await query.OrderBy(x => x.Producto.Nombre).ThenBy(x => x.Producto.Id).Skip((pagina - 1) * tamanoPagina).Take(tamanoPagina)
-            .Select(x => new ExistenciaDto(x.Producto.Id, x.Producto.Codigo, x.Producto.Nombre, x.Producto.Categoria,
-                x.Producto.UnidadMedida, x.Producto.Activo, x.Producto.StockMinimo, x.Cantidad, x.Version)).ToListAsync(ct);
+            .Select(x => new ExistenciaDto(x.Producto.Id, x.Producto.Codigo, x.Producto.Nombre, x.Producto.CategoriaCatalogo.Nombre,
+                x.Producto.UnidadMedidaCatalogo.Codigo, x.Producto.Activo, x.Producto.StockMinimo, x.Cantidad, x.Version)).ToListAsync(ct);
         return new(items, total, pagina, tamanoPagina);
     }
 
@@ -80,7 +80,7 @@ public sealed class InventarioRepository(UsuariosDbContext context) : IInventari
                     throw new BusinessException("Ese identificador de operación ya se utilizó con otros datos.", 409);
                 return await context.MovimientosInventario.AsNoTracking().Where(x => x.Id == anterior.Id).Select(Proyeccion).SingleAsync(ct);
             }
-            var producto = await context.Productos.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.ProductoId, ct)
+            var producto = await context.Productos.AsNoTracking().Include(x => x.UnidadMedidaCatalogo).SingleOrDefaultAsync(x => x.Id == request.ProductoId, ct)
                 ?? throw new BusinessException("Producto no encontrado.", 404);
             if (!producto.Activo) throw new BusinessException("El producto está inactivo. Reactivalo antes de registrar movimientos.");
             var origen = await context.Depositos.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
@@ -94,7 +94,7 @@ public sealed class InventarioRepository(UsuariosDbContext context) : IInventari
             if (versionActual != request.VersionOrigen)
                 throw new BusinessException("Las existencias cambiaron desde tu consulta. Cerrá la ventana, actualizá el inventario y volvé a intentar.", 409);
             var destino = request.DepositoDestinoId.HasValue ? await ObtenerSaldoAsync(request.ProductoId, request.DepositoDestinoId.Value, ct) : null;
-            var (nuevo, nuevoDestino) = InventarioReglas.Calcular(request.Tipo, request.Cantidad, saldo.Cantidad, destino?.Cantidad, producto.UnidadMedida);
+            var (nuevo, nuevoDestino) = InventarioReglas.Calcular(request.Tipo, request.Cantidad, saldo.Cantidad, destino?.Cantidad, producto.UnidadMedidaCatalogo.Codigo);
             var movimiento = new MovimientoInventario
             {
                 OperacionId = request.OperacionId, ProductoId = request.ProductoId, DepositoId = request.DepositoId,
@@ -148,7 +148,7 @@ public sealed class InventarioRepository(UsuariosDbContext context) : IInventari
     private static string Patron(string value) => "%" + value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
 
     private static readonly Expression<Func<MovimientoInventario, MovimientoDto>> Proyeccion = x => new(
-        x.Id, x.OperacionId, x.ProductoId, x.Producto.Codigo, x.Producto.Nombre, x.Producto.UnidadMedida,
+        x.Id, x.OperacionId, x.ProductoId, x.Producto.Codigo, x.Producto.Nombre, x.Producto.UnidadMedidaCatalogo.Codigo,
         x.DepositoId, x.Deposito.Nombre, x.DepositoDestinoId, x.DepositoDestino == null ? null : x.DepositoDestino.Nombre,
         x.Tipo, x.Cantidad, x.Variacion, x.StockAnterior, x.StockPosterior, x.StockDestinoAnterior, x.StockDestinoPosterior,
         x.Motivo, x.CreadoEn, x.CreadoPor);

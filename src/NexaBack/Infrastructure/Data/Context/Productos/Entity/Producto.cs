@@ -1,3 +1,4 @@
+using NexaBack.Infrastructure.Data.Context.Marcas.Entity;
 using NexaBack.Infrastructure.Persistence;
 
 namespace NexaBack.Infrastructure.Data.Context.Productos.Entity;
@@ -9,9 +10,12 @@ public sealed class Producto : IEntidadAuditable
     public required string Nombre { get; set; }
     public string? Descripcion { get; set; }
     public string? CodigoBarras { get; set; }
-    public string? Marca { get; set; }
-    public required string Categoria { get; set; }
-    public required string UnidadMedida { get; set; }
+    public int? MarcaId { get; set; }
+    public Marca? Marca { get; set; }
+    public int CategoriaId { get; set; }
+    public Categorias.Entity.Categoria CategoriaCatalogo { get; set; } = null!;
+    public int UnidadMedidaId { get; set; }
+    public UnidadesMedida.Entity.UnidadMedida UnidadMedidaCatalogo { get; set; } = null!;
     public decimal Costo { get; set; }
     public decimal PrecioVenta { get; set; }
     public decimal StockMinimo { get; set; }

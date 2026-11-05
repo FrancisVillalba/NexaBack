@@ -1,3 +1,9 @@
+using NexaBack.Infrastructure.Data.Context.Categorias.Entity;
+using NexaBack.Infrastructure.Data.Context.Categorias.Configurations;
+using NexaBack.Infrastructure.Data.Context.UnidadesMedida.Entity;
+using NexaBack.Infrastructure.Data.Context.UnidadesMedida.Configurations;
+using NexaBack.Infrastructure.Data.Context.Marcas.Entity;
+using NexaBack.Infrastructure.Data.Context.Marcas.Configurations;
 using NexaBack.Infrastructure.Data.Context.TiposDocumento.Entity;
 using NexaBack.Infrastructure.Data.Context.TiposDocumento.Configurations;
 using NexaBack.Infrastructure.Data.Context.Presupuestos.Entity;
@@ -32,6 +38,9 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
     public DbSet<Perfil> Perfiles => Set<Perfil>();
     public DbSet<Acceso> Accesos => Set<Acceso>();
     public DbSet<PerfilAcceso> PerfilesAccesos => Set<PerfilAcceso>();
+    public DbSet<Categoria> Categorias => Set<Categoria>();
+    public DbSet<UnidadMedida> UnidadesMedida => Set<UnidadMedida>();
+    public DbSet<Marca> Marcas => Set<Marca>();
     public DbSet<Producto> Productos => Set<Producto>();
     public DbSet<Deposito> Depositos => Set<Deposito>();
     public DbSet<Existencia> Existencias => Set<Existencia>();
@@ -50,7 +59,10 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfiguration(new UnidadMedidaConfiguration());
+        modelBuilder.ApplyConfiguration(new CategoriaConfiguration());
         modelBuilder.HasDefaultSchema("usuarios");
+        modelBuilder.ApplyConfiguration(new MarcaConfiguration());
         modelBuilder.ApplyConfiguration(new TipoDocumentoConfiguration());
         modelBuilder.ApplyConfiguration(new PresupuestoConfiguration());
         modelBuilder.ApplyConfiguration(new PresupuestoDetalleConfiguration());

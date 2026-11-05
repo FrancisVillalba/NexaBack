@@ -104,7 +104,7 @@ public sealed class ReportesRepository(UsuariosDbContext context) : IReportesRep
         return new(costo, resumen.Importe - costo, resumen.Registros == 0 ? 0 : resumen.Importe / resumen.Registros, await Dias(q, ct), productos);
     }
     private async Task<IReadOnlyList<ReporteCategoriaDto>> Categorias(int? depositoId, CancellationToken ct)
-        => await Inventario(depositoId, false).Join(context.Productos.AsNoTracking(), f => f.Id, p => p.Id, (f, p) => new { p.Categoria, f.Importe })
+        => await Inventario(depositoId, false).Join(context.Productos.AsNoTracking(), f => f.Id, p => p.Id, (f, p) => new { Categoria = p.CategoriaCatalogo.Nombre, f.Importe })
             .GroupBy(x => x.Categoria).OrderBy(g => g.Key)
             .Select(g => new ReporteCategoriaDto(g.Key, g.Count(), g.Sum(x => x.Importe))).ToListAsync(ct);
 
@@ -154,5 +154,5 @@ public sealed class ReportesRepository(UsuariosDbContext context) : IReportesRep
     private IQueryable<ReporteFilaDto> Inventario(int? depositoId, bool soloActivos)
         => context.Productos.AsNoTracking().Where(p => !soloActivos || p.Activo)
             .Select(p => new { Producto = p, Cantidad = context.Existencias.Where(e => e.ProductoId == p.Id && (!depositoId.HasValue || e.DepositoId == depositoId)).Sum(e => (decimal?)e.Cantidad) ?? 0m })
-            .Select(x => new ReporteFilaDto { Id = x.Producto.Id, Referencia = x.Producto.Codigo, Fecha = null, Nombre = x.Producto.Nombre, Estado = x.Producto.Activo ? "Activo" : "Inactivo", Importe = x.Cantidad * x.Producto.Costo, Aplicado = 0, Saldo = 0, Cantidad = x.Cantidad, Unidad = x.Producto.UnidadMedida, Costo = x.Producto.Costo, Minimo = x.Producto.StockMinimo });
+            .Select(x => new ReporteFilaDto { Id = x.Producto.Id, Referencia = x.Producto.Codigo, Fecha = null, Nombre = x.Producto.Nombre, Estado = x.Producto.Activo ? "Activo" : "Inactivo", Importe = x.Cantidad * x.Producto.Costo, Aplicado = 0, Saldo = 0, Cantidad = x.Cantidad, Unidad = x.Producto.UnidadMedidaCatalogo.Codigo, Costo = x.Producto.Costo, Minimo = x.Producto.StockMinimo });
 }

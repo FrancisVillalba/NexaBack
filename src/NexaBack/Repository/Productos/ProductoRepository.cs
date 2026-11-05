@@ -10,15 +10,15 @@ public sealed class ProductoRepository(UsuariosDbContext context) : IProductoRep
 {
     public async Task<(IReadOnlyList<Producto> Items, int Total)> ListarAsync(int offset, int limite, string? buscar, bool? activo, CancellationToken ct)
     {
-        var query = context.Productos.AsNoTracking();
+        var query = context.Productos.AsNoTracking().Include(x => x.Marca).Include(x => x.CategoriaCatalogo).Include(x => x.UnidadMedidaCatalogo).AsQueryable();
         if (activo.HasValue) query = query.Where(x => x.Activo == activo.Value);
         if (!string.IsNullOrEmpty(buscar))
         {
             // Escapar comodines permite buscar literalmente símbolos como % y _.
             var patron = "%" + buscar.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
             query = query.Where(x => EF.Functions.ILike(x.Codigo, patron, "\\")
-                || EF.Functions.ILike(x.Nombre, patron, "\\") || EF.Functions.ILike(x.Categoria, patron, "\\")
-                || EF.Functions.ILike(x.Marca ?? "", patron, "\\") || EF.Functions.ILike(x.CodigoBarras ?? "", patron, "\\"));
+                || EF.Functions.ILike(x.Nombre, patron, "\\") || EF.Functions.ILike(x.CategoriaCatalogo.Nombre, patron, "\\")
+                || EF.Functions.ILike(x.Marca == null ? "" : x.Marca.Nombre, patron, "\\") || EF.Functions.ILike(x.CodigoBarras ?? "", patron, "\\"));
         }
         var total = await query.CountAsync(ct);
         var items = await query.OrderBy(x => x.Nombre).ThenBy(x => x.Id).Skip(offset).Take(limite).ToListAsync(ct);
@@ -26,7 +26,7 @@ public sealed class ProductoRepository(UsuariosDbContext context) : IProductoRep
     }
 
     public Task<Producto?> ObtenerAsync(int id, bool paraActualizar, CancellationToken ct)
-        => (paraActualizar ? context.Productos : context.Productos.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id, ct);
+        => (paraActualizar ? context.Productos : context.Productos.AsNoTracking()).Include(x => x.Marca).Include(x => x.CategoriaCatalogo).Include(x => x.UnidadMedidaCatalogo).SingleOrDefaultAsync(x => x.Id == id, ct);
 
     public Task<bool> ExisteCodigoAsync(string codigo, int? excluirId, CancellationToken ct)
         => context.Productos.AnyAsync(x => x.Codigo == codigo && x.Id != excluirId, ct);

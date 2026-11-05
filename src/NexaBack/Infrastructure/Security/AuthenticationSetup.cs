@@ -83,6 +83,10 @@ public static class AuthenticationSetup
             options.AddPolicy("tipos-documento.consultar", policy => policy.RequireAuthenticatedUser()
                 .RequireAssertion(ctx => new[] { "clientes.ver", "clientes.crear", "clientes.editar", "proveedores.ver", "proveedores.crear",
                     "proveedores.editar", "personas.ver", "personas.crear", "personas.editar" }.Any(codigo => ctx.User.HasClaim("acceso", codigo))));
+            options.AddPolicy("productos.catalogos", policy => policy.RequireAuthenticatedUser()
+                .RequireAssertion(ctx => new[] { "productos.ver", "productos.crear", "productos.editar" }.Any(codigo => ctx.User.HasClaim("acceso", codigo))));
+            options.AddPolicy("productos.marcas", policy => policy.RequireAuthenticatedUser()
+                .RequireAssertion(ctx => new[] { "productos.ver", "productos.crear", "productos.editar" }.Any(codigo => ctx.User.HasClaim("acceso", codigo))));
             foreach (var access in AccessCatalog.Definitions)
                 options.AddPolicy("acceso:" + access.Codigo, policy => policy.RequireAuthenticatedUser().AddRequirements(new AccessRequirement(access.Codigo)));
         });

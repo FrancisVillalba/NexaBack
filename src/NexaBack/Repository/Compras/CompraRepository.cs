@@ -50,7 +50,7 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
             var deposito = await context.Depositos.SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
             if (deposito is null || !deposito.Activo) throw new BusinessException("El depósito no existe o está inactivo.");
             var ids = request.Items.Select(x => x.ProductoId).ToArray();
-            var productos = await context.Productos.Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+            var productos = await context.Productos.Include(x => x.UnidadMedidaCatalogo).Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
             var compra = new Compra {
                 OperacionId = request.OperacionId, SolicitudHash = solicitudHash, ProveedorId = proveedor.Id,
                 ProveedorNombre = proveedor.NombreRazonSocial,
@@ -60,9 +60,9 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
             foreach (var item in request.Items)
             {
                 if (!productos.TryGetValue(item.ProductoId, out var producto) || !producto.Activo) throw new BusinessException("Un producto no existe o está inactivo.");
-                var subtotal = CompraReglas.Subtotal(item.Cantidad, item.CostoUnitario, producto.UnidadMedida);
+                var subtotal = CompraReglas.Subtotal(item.Cantidad, item.CostoUnitario, producto.UnidadMedidaCatalogo.Codigo);
                 compra.Detalles.Add(new CompraDetalle { ProductoId = producto.Id, ProductoCodigo = producto.Codigo,
-                    ProductoNombre = producto.Nombre, UnidadMedida = producto.UnidadMedida,
+                    ProductoNombre = producto.Nombre, UnidadMedida = producto.UnidadMedidaCatalogo.Codigo,
                     Cantidad = item.Cantidad, CostoUnitario = item.CostoUnitario, Subtotal = subtotal });
                 compra.Total += subtotal;
             }
@@ -87,12 +87,12 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
             if (!deposito.Activo) throw new BusinessException("El depósito está inactivo.");
             if (compra.Detalles.Count == 0) throw new BusinessException("La compra no tiene productos.");
             var ids = compra.Detalles.Select(x => x.ProductoId).ToArray();
-            var productos = await context.Productos.Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+            var productos = await context.Productos.Include(x => x.UnidadMedidaCatalogo).Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
             var saldos = await context.Existencias.Where(x => x.DepositoId == compra.DepositoId && ids.Contains(x.ProductoId)).ToDictionaryAsync(x => x.ProductoId, ct);
             foreach (var item in compra.Detalles.OrderBy(x => x.ProductoId))
             {
                 if (item.MovimientoId is not null) throw new BusinessException("La línea ya tiene un movimiento asociado.", 409);
-                if (!productos.TryGetValue(item.ProductoId, out var producto) || !producto.Activo || producto.UnidadMedida != item.UnidadMedida)
+                if (!productos.TryGetValue(item.ProductoId, out var producto) || !producto.Activo || producto.UnidadMedidaCatalogo.Codigo != item.UnidadMedida)
                     throw new BusinessException("Un producto está inactivo o cambió su unidad. Revisá la compra antes de recibirla.", 409);
                 if (!saldos.TryGetValue(item.ProductoId, out var saldo))
                 {
@@ -144,10 +144,10 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
     public async Task<IReadOnlyList<CompraProductoDto>> ProductosAsync(string buscar, CancellationToken ct)
     {
         var patron = Patron(buscar);
-        return await context.Productos.AsNoTracking().Where(x => x.Activo && (EF.Functions.ILike(x.Nombre, patron, "\\")
+        return await context.Productos.AsNoTracking().Include(x => x.UnidadMedidaCatalogo).Where(x => x.Activo && (EF.Functions.ILike(x.Nombre, patron, "\\")
             || EF.Functions.ILike(x.Codigo, patron, "\\") || EF.Functions.ILike(x.CodigoBarras ?? "", patron, "\\")))
             .OrderBy(x => x.Nombre).ThenBy(x => x.Id).Take(20)
-            .Select(x => new CompraProductoDto(x.Id, x.Codigo, x.Nombre, x.UnidadMedida, x.Costo)).ToListAsync(ct);
+            .Select(x => new CompraProductoDto(x.Id, x.Codigo, x.Nombre, x.UnidadMedidaCatalogo.Codigo, x.Costo)).ToListAsync(ct);
     }
     public async Task<IReadOnlyList<CompraDepositoDto>> DepositosAsync(CancellationToken ct)
         => await context.Depositos.AsNoTracking().Where(x => x.Activo).OrderBy(x => x.Nombre).Select(x => new CompraDepositoDto(x.Id, x.Nombre)).ToListAsync(ct);
