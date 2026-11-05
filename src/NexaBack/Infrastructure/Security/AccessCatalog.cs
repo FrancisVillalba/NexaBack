@@ -15,19 +15,19 @@ public static class AccessCatalog
         var result = new List<AccessDefinition>();
         void Add(string module, params string[] actions)
         {
-            foreach (var action in actions) result.Add(new($"{module}.{action}", module, action, action switch
+            foreach (var action in actions) result.Add(new($"{module}.{action}", module, action, action == "cancelar" && module == "presupuestos" ? "Cancelar presupuestos" : action switch
             {
                 "ver" => "Ver", "crear" => "Crear", "editar" => "Editar", "estado" => "Activar / desactivar",
                 "password" => "Cambiar contraseñas", "recibir" => "Recibir mercadería", "anular" => "Anular ventas",
                 "pagar" => "Registrar pagos", "anular_pago" => "Anular pagos",
-                "cobrar" => "Registrar cobros", "anular_cobro" => "Anular cobros", "eliminar" => "Eliminar", "convertir" => "Convertir en venta",
+                "cobrar" => "Registrar cobros", "anular_cobro" => "Anular cobros", "eliminar" => "Eliminar", "convertir" => "Convertir en venta", "aprobar" => "Aprobar presupuestos",
                 "cuenta_corriente" => "Consultar cuenta corriente", "exportar" => "Exportar",
                 "cancelar" => "Cancelar compras pendientes", "restablecer" => "Restablecer datos", _ => action
             }));
         }
         Add("inicio", "ver"); Add("productos", "ver", "crear", "editar", "estado"); Add("inventario", "ver");
         Add("movimientos", "ver", "crear"); Add("compras", "ver", "crear", "recibir", "cancelar", "pagar", "anular_pago");
-        Add("ventas", "ver", "crear", "anular", "cobrar", "anular_cobro"); Add("presupuestos", "ver", "crear", "eliminar", "convertir");
+        Add("ventas", "ver", "crear", "anular", "cobrar", "anular_cobro"); Add("presupuestos", "ver", "crear", "editar", "aprobar", "cancelar", "convertir");
         Add("clientes", "ver", "crear", "editar", "estado", "cuenta_corriente"); Add("proveedores", "ver", "crear", "editar", "estado", "cuenta_corriente");
         Add("reportes", "ver", "exportar"); Add("configuracion", "ver", "editar", "restablecer");
         Add("personas", "ver", "crear", "editar", "estado"); Add("usuarios", "ver", "crear", "editar", "estado", "password");

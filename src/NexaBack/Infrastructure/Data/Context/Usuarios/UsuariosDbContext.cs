@@ -1,3 +1,5 @@
+using NexaBack.Infrastructure.Data.Context.Presupuestos.Entity;
+using NexaBack.Infrastructure.Data.Context.Presupuestos.Configurations;
 using NexaBack.Infrastructure.Data.Context.Pagos.Entity;
 using NexaBack.Infrastructure.Data.Context.Pagos.Configurations;
 using NexaBack.Infrastructure.Data.Context.Cobros.Entity;
@@ -31,6 +33,8 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
     public DbSet<Deposito> Depositos => Set<Deposito>();
     public DbSet<Existencia> Existencias => Set<Existencia>();
     public DbSet<MovimientoInventario> MovimientosInventario => Set<MovimientoInventario>();
+    public DbSet<Presupuesto> Presupuestos => Set<Presupuesto>();
+    public DbSet<PresupuestoDetalle> PresupuestosDetalles => Set<PresupuestoDetalle>();
     public DbSet<Pago> Pagos => Set<Pago>();
     public DbSet<Cobro> Cobros => Set<Cobro>();
     public DbSet<Venta> Ventas => Set<Venta>();
@@ -44,6 +48,8 @@ public sealed class UsuariosDbContext(DbContextOptions<UsuariosDbContext> option
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("usuarios");
+        modelBuilder.ApplyConfiguration(new PresupuestoConfiguration());
+        modelBuilder.ApplyConfiguration(new PresupuestoDetalleConfiguration());
         modelBuilder.ApplyConfiguration(new PagoConfiguration());
         modelBuilder.ApplyConfiguration(new CobroConfiguration());
         modelBuilder.ApplyConfiguration(new VentaConfiguration());

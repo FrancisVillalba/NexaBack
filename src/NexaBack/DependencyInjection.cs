@@ -1,3 +1,7 @@
+using NexaBack.Repository.Reportes;
+using NexaBack.Services.Reportes;
+using NexaBack.Repository.Presupuestos;
+using NexaBack.Services.Presupuestos;
 using NexaBack.Repository.Pagos;
 using NexaBack.Services.Pagos;
 using NexaBack.Repository.CuentasProveedores;
@@ -68,6 +72,10 @@ public static class DependencyInjection
         services.AddScoped<IPagoService, PagoService>();
         services.AddScoped<ICuentaProveedorRepository, CuentaProveedorRepository>();
         services.AddScoped<ICuentaProveedorService, CuentaProveedorService>();
+        services.AddScoped<IPresupuestoRepository, PresupuestoRepository>();
+        services.AddScoped<IPresupuestoService, PresupuestoService>();
+        services.AddScoped<IReportesRepository, ReportesRepository>();
+        services.AddScoped<IReportesService, ReportesService>();
         return services;
     }
 }

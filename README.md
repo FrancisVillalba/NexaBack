@@ -31,7 +31,7 @@ Se incluyen controladores con `[ApiController]`, referencias anulables, inyecci�
 
 El frontend consume las API con Authorization: Bearer. Los permisos se consultan en PostgreSQL y se incluyen en el JWT. Si cambian, se requiere iniciar sesión nuevamente. La sesión vence a los 30 minutos.
 
-Productos, Inventario, Clientes, Proveedores, Compras y Ventas consultan la base real. Presupuestos, Inicio y Reportes todavía conservan datos locales de demostración.
+Productos, Inventario, Clientes, Proveedores, Compras y Ventas consultan la base real. Presupuestos, Inicio y Reportes también consultan sus APIs reales.
 
 ## Clientes y proveedores: preparación manual
 
@@ -189,7 +189,7 @@ El flujo es Pendiente → Recibida o Pendiente → Cancelada. Crear una orden gu
 
 `comercial.compras` y `comercial.compras_detalles` guardan auditoría de creación y modificación. Los nombres, códigos, unidades y costos de la orden se conservan como datos históricos. El total se calcula en el servidor redondeando cada subtotal a dos decimales; no incluye impuestos, facturación fiscal ni pagos. Recibir una compra modifica existencias y movimientos, sin reemplazar automáticamente el costo ni el precio de venta del catálogo.
 
-El front usa `comprasListado.tsx`, `comprasEdicion.tsx`, `comprasDetalle.tsx`, `comprasServicio.ts` y `comprasTipos.ts`. Los catálogos mínimos de Compras requieren `compras.crear`; no necesitan acceso administrativo a Depósitos. No se importan órdenes del template. Presupuestos, Inicio y Reportes todavía conservan su demostración local y no reflejan automáticamente las compras y ventas reales.
+El front usa `comprasListado.tsx`, `comprasEdicion.tsx`, `comprasDetalle.tsx`, `comprasServicio.ts` y `comprasTipos.ts`. Los catálogos mínimos de Compras requieren `compras.crear`; no necesitan acceso administrativo a Depósitos. No se importan órdenes del template. Inicio y Reportes consultan las compras y ventas reales mediante su API.
 
 Tipo de documento comercial: los ABM de Clientes y Proveedores exigen seleccionar CI (Cédula de identidad), RUC, PASAPORTE u OTRO. El backend valida el catálogo y normaliza el código. Ejecutar manualmente 010_Tipo_Documento_Comercial.sql después del 009, con el backend detenido. Los registros anteriores quedan con tipo nulo y se muestran como Sin definir, hasta que se editen para clasificarlos. El índice único es por tipo y número dentro de cada tabla; ante una coincidencia con un registro anterior sin clasificar, se solicita editar ese registro para evitar duplicarlo. Las compras nuevas conservan ProveedorTipoDocumento junto al documento histórico; las anteriores no se reclasifican con el tipo actual del proveedor. No se modificó el esquema de Personas.
 
@@ -203,9 +203,9 @@ Confirmar guarda venta, detalle, salidas de inventario y nuevos saldos en una tr
 
 La anulación requiere permiso, versión y motivo. Devuelve toda la cantidad al depósito original mediante nuevas entradas, conserva los movimientos de salida y guarda fecha, usuario y motivo de anulación. Repetir la misma anulación no devuelve stock nuevamente. El depósito original debe estar activo; se permite devolver productos que se desactivaron después de venderlos. No hay anulaciones parciales en esta etapa.
 
-La venta conserva nombre, tipo y número de documento del cliente; depósito; nombres, códigos, unidades, costos y precios de los productos. Confirmada describe la operación de stock: no significa Pagada. Los cobros y las cuentas corrientes de clientes usan la API real. No integra caja ni impuestos desglosados y no emite documentación fiscal. Inicio y Reportes todavía muestran la demostración local. La conversión de presupuestos del template se deshabilita hasta conectar Presupuestos al backend, para evitar asociar IDs locales con productos reales.
+La venta conserva nombre, tipo y número de documento del cliente; depósito; nombres, códigos, unidades, costos y precios de los productos. Confirmada describe la operación de stock: no significa Pagada. Los cobros y las cuentas corrientes de clientes usan la API real. No integra caja ni impuestos desglosados y no emite documentación fiscal. Inicio y Reportes muestran datos reales. El módulo de Presupuestos usa su API real; no importa ni convierte los presupuestos locales anteriores del template.
 
-Código del front en ventasListado.tsx, ventasEdicion.tsx, ventasDetalle.tsx, ventasServicio.ts y ventasTipos.ts. El editor local de presupuestos se separó en presupuestosEdicion.tsx. Los comprobantes antiguos de Inicio se conservan para consulta, sin botones de cobro o anulación.
+Código del front en ventasListado.tsx, ventasEdicion.tsx, ventasDetalle.tsx, ventasServicio.ts y ventasTipos.ts. El editor de presupuestos en presupuestosEdicion.tsx utiliza la API real. Inicio muestra las últimas ventas reales y abre su detalle conectado; no muestra comprobantes del template.
 
 ## Cobros y cuentas corrientes de clientes
 
@@ -215,7 +215,7 @@ En Ventas > Ver detalle > Cobros se registran importes parciales o totales, fech
 
 Anular un cobro exige permiso y motivo, conserva su historial y reabre el saldo. No ejecuta devoluciones bancarias ni movimientos de stock. Una venta con cobros vigentes no puede anularse: primero deben anularse sus cobros.
 
-Clientes > Cuenta corriente muestra ventas, cobros, anulaciones y saldo, incluso para clientes inactivos. Los totales se calculan con ventas confirmadas y cobros vigentes; no se almacena un saldo duplicado. Ambos historiales tienen paginación independiente. Inicio y Reportes siguen pendientes de conexión; no hay integración con Caja ni bancos.
+Clientes > Cuenta corriente muestra ventas, cobros, anulaciones y saldo, incluso para clientes inactivos. Los totales se calculan con ventas confirmadas y cobros vigentes; no se almacena un saldo duplicado. Ambos historiales tienen paginación independiente. Inicio y Reportes consultan los saldos reales; no hay integración con Caja ni bancos.
 
 El código mantiene servicios y repositorios independientes para Cobros y CuentasCorrientes. En React, los módulos principales son cobrosVenta.tsx, cobrosServicio.ts y clientesCuentaCorriente.tsx, con sus tipos y comentarios en español.
 
@@ -233,4 +233,40 @@ Anular un pago exige permiso, versión y motivo: conserva el registro, fecha y u
 
 Proveedores > Cuenta corriente muestra compras, pagos y saldo pendiente, con dos historiales paginados y acceso al detalle si se dispone de compras.ver. La deuda se calcula únicamente con compras recibidas menos pagos vigentes, en una instantánea consistente de lectura. El historial conserva compras pendientes/canceladas y pagos anulados sin sumarlos a la deuda.
 
-El backend usa IPagoRepository/PagoRepository, IPagoService/PagoService y sus equivalentes CuentaProveedor. El front mantiene pagosCompra.tsx, pagosServicio.ts, pagosTipos.ts y proveedoresCuentaCorriente.tsx con su servicio y tipos. Inicio y Reportes todavía no reflejan estas operaciones reales.
+El backend usa IPagoRepository/PagoRepository, IPagoService/PagoService y sus equivalentes CuentaProveedor. El front mantiene pagosCompra.tsx, pagosServicio.ts, pagosTipos.ts y proveedoresCuentaCorriente.tsx con su servicio y tipos. Inicio y Reportes reflejan estas operaciones reales.
+
+## Presupuestos reales
+
+Ejecutar manualmente 014_Presupuestos.sql, ubicado en back/src/NexaBack/Infrastructure/Persistence/Sql, con el backend detenido. Requiere Clientes independientes (009/010), Productos, Inventario y Ventas (011). Crea comercial.presupuestos y comercial.presupuestos_detalles, con auditoría de cabecera/líneas, versiones y vínculo único a la venta. No importa propuestas del template ni modifica existencias. No hay ejecución automática de scripts al iniciar.
+
+Reiniciar backend y renovar la sesión después de asignar presupuestos.ver/crear/editar/aprobar/cancelar/convertir. El script no amplía permisos de perfiles y desactiva el antiguo presupuestos.eliminar: las propuestas se cancelan con motivo, conservando historial. Convertir exige simultáneamente presupuestos.convertir y ventas.crear; consultar la venta exige ventas.ver. Los catálogos y el cálculo permiten crear o editar según los permisos firmados en el token, sin exigir acceso administrativo.
+
+El circuito es Borrador → Aprobado → Convertido. Solo se editan borradores. Borradores y aprobados se pueden cancelar con motivo; un presupuesto convertido no se cancela ni vuelve a convertirse, aunque luego se anule su venta. Vencido es una condición calculada, no un cambio automático de estado: la fecha es inclusiva según el calendario de Argentina. Un borrador vencido puede editarse para renovar su vencimiento; un aprobado vencido ya no se convierte.
+
+Crear o editar permite buscar cliente activo, depósito y productos reales, cantidades, descuento, observaciones y vencimiento. Calcular total consulta el backend y guardar valida que no hayan cambiado las versiones revisadas. Se conservan nombre/documento del cliente, depósito, códigos/nombres/unidades/precios de productos e importes históricos. Los presupuestos no reservan ni descuentan stock y pueden superar las existencias actuales. Se exige un total positivo y se redondea por línea a dos decimales.
+
+Desde el detalle, aprobar congela el borrador. Revisar y convertir consulta precios y stock actuales: muestra precios originales frente a actuales, descuento conservado y nuevo total. El usuario debe confirmar la revisión. La venta usa precios actuales del catálogo y cantidades del presupuesto; si cambia un producto o falta stock después de revisar, la API rechaza la confirmación y exige recalcular. Los importes originales del presupuesto no se reemplazan por los de la venta.
+
+Venta, movimientos de salida, existencias y estado/vínculo del presupuesto se guardan en una sola transacción serializable. La conversión reutiliza el repositorio de Ventas dentro de esa unidad de trabajo. UUID, hash de contenido, versión del presupuesto y de productos impiden duplicar ventas en reintentos o convertir dos veces. Si se pierde una respuesta, las pantallas bloquean edición y permiten reenviar la misma operación. Crear y editar también conservan su identificador de reintento. Las anulaciones/cobros de la venta siguen usando su circuito normal.
+
+Código del front: presupuestosListado.tsx, presupuestosEdicion.tsx, presupuestosDetalle.tsx, presupuestosConversion.tsx, presupuestosServicio.ts y presupuestosTipos.ts. El listado usa paginación, búsqueda y filtros de estado/vencido. Inicio y Reportes consultan las operaciones reales. No se agregó facturación fiscal.
+
+## Inicio y Reportes conectados
+
+No hay SQL nuevo: solo consultas sobre las tablas ya instaladas de Productos/Inventario, Ventas, Compras, Cobros y Pagos. No guarda indicadores ni duplica saldos. Reiniciar backend y recargar front. Se conservan los permisos inicio.ver, reportes.ver y reportes.exportar; si se cambia su asignación, renovar la sesión.
+
+El backend tiene IReportesRepository/ReportesRepository e IReportesService/ReportesService, con endpoints GET /api/inicio, /api/inicio/depositos, /api/reportes, /api/reportes/depositos y /api/reportes/exportar. Las consultas usan una transacción RepeatableRead para mantener consistentes totales, páginas, análisis y exportación. No ejecuta SaveChanges. Los depósitos se filtran por ID real, incluidos inactivos; el selector de cada pantalla es independiente de la antigua selección local por nombre del template.
+
+Inicio muestra ventas confirmadas, compras recibidas, cobros y pagos vigentes del mes hasta hoy. También muestra deuda actual por cobrar/pagar, valorización actual del inventario, productos activos con stock menor o igual al mínimo, últimas 6 ventas confirmadas y gráfico diario de los últimos 7 días. Permite abrir el detalle real de una venta. Las categorías y el stock se consultan desde las tablas actuales, sin datos locales como alternativa ante un error. Con Todos los depósitos se suma el stock de cada producto en todos los depósitos, incluidos los inactivos, y se compara ese total con su mínimo.
+
+Reportes ofrece Ventas, Compras recibidas, Cobros, Pagos, Inventario, Cuentas por cobrar y Cuentas por pagar. Paginación de 20 filas, totales de todos los registros y filtros por depósito y período (hasta 366 días). Ventas usa CreadoEn; compras, RecibidoEn; cobros y pagos, FechaCobro/FechaPago. El período es inclusivo según el calendario de Argentina: para timestamps se consulta desde la medianoche local hasta la medianoche posterior a Hasta. No depende de la zona horaria del servidor. El gráfico diario también agrupa con esa zona horaria.
+
+Los reportes muestran únicamente operaciones vigentes al consultar. Una venta anulada, compra pendiente/cancelada o cobro/pago anulado no suma a sus totales operativos. Las cuentas y el inventario son actuales, de todos los períodos: no representan un cierre histórico. En ventas/compras, los importes aplicados y saldos incluyen todos los cobros/pagos vigentes de la operación, incluso si su fecha cae fuera del período elegido. Las cuentas agrupan por cliente/proveedor y conservan contactos inactivos.
+
+El análisis de ventas incluye costo histórico de sus líneas, margen bruto estimado (total neto menos ese costo), ticket promedio, ventas por día y hasta 5 productos por importe bruto sin el descuento general. El agrupamiento de productos conserva códigos, nombres y unidades históricos. No suma unidades heterogéneas ni usa el costo actual del catálogo para estimar el margen. El inventario se valoriza al costo actual y también se agrupa por categoría actual; incluye productos inactivos para no ocultar existencias.
+
+Inicio filtra las secciones desde el backend según los permisos firmados en el token. Reportes exige reportes.ver y, según la sección, ventas.ver, compras.ver, inventario.ver, clientes.cuenta_corriente o proveedores.cuenta_corriente. El front oculta las secciones que no corresponden; la API rechaza consultas directas sin permiso. Exportar exige además reportes.exportar. No cambia ni amplía perfiles automáticamente.
+
+Exportar CSV completo consulta nuevamente el backend y exporta todas las filas filtradas, no solo la página visible. Cada archivo incorpora depósito, período/situación actual, fecha de generación y totales de esa misma instantánea. Máximo 10.000 filas: si se supera, solicita reducir el filtro y rechaza la exportación completa en lugar de truncarla. El CSV conserva decimales, escapa separadores/comillas y protege los textos interpretables como fórmulas. Imprimir página imprime la vista visible.
+
+El front usa inicioServicio.ts y reportesServicio.ts/reportesTipos.ts/reportesTabla.tsx/reportesColumnas.ts/reportesGraficos.tsx, con comentarios en español. Se retiró el gráfico de demostración con fechas fijas. Configuración conserva su demostración local. No se agregó integración con Caja, bancos ni facturación fiscal.

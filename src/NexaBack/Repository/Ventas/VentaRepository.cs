@@ -59,6 +59,9 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
 
     public async Task<VentaDto> ConfirmarAsync(VentaConfirmarRequest request, string hash, CancellationToken ct)
     {
+        // Presupuestos controla el commit conjunto de venta, stock y vínculo.
+        // No recuperar conflictos dentro de una transacción ajena: PostgreSQL puede haberla invalidado.
+        if (context.Database.CurrentTransaction is not null) return await ConfirmarTransaccionAsync(request, hash, ct);
         try { return await ConfirmarTransaccionAsync(request, hash, ct); }
         catch (BusinessException ex) when (ex.StatusCode == 409)
         {
@@ -189,6 +192,7 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
     private int Usuario() => context.UsuarioAuditoriaId ?? throw new BusinessException("Se requiere una sesión válida.", 401);
     private async Task<VentaDto> TransaccionAsync(Func<Task<VentaDto>> accion, CancellationToken ct)
     {
+        if (context.Database.CurrentTransaction is not null) return await accion();
         // Evita ventas simultáneas sobre el mismo saldo y anulación/confirmación duplicadas.
         await using var transaccion = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         try { var resultado = await accion(); await transaccion.CommitAsync(ct); return resultado; }
