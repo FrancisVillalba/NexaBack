@@ -20,6 +20,9 @@ public sealed class ComprasController(ICompraService service) : ControllerBase
         var compra = await service.CrearAsync(request, ct);
         return CreatedAtAction(nameof(Obtener), new { id = compra.Id }, compra);
     }
+    [HttpPut("{id:int}"), RequireAccess("compras.crear")]
+    public async Task<ActionResult<CompraDto>> Editar(int id, EditarCompraRequest request, CancellationToken ct)
+        => Ok(await service.EditarAsync(id, request, ct));
     [HttpPost("{id:int}/recibir"), RequireAccess("compras.recibir")]
     public async Task<ActionResult<CompraDto>> Recibir(int id, CompraEstadoRequest request, CancellationToken ct)
         => Ok(await service.RecibirAsync(id, request, ct));

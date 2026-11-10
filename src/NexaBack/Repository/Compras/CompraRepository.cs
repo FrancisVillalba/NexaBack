@@ -45,31 +45,69 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
                     throw new BusinessException("El identificador de operación ya se utilizó con otros datos.", 409);
                 return Map(anterior);
             }
-            var proveedor = await context.Proveedores.Include(x => x.TipoDocumento).SingleOrDefaultAsync(x => x.Id == request.ProveedorId, ct);
-            if (proveedor is null || !proveedor.Activo) throw new BusinessException("El proveedor no existe o está inactivo.");
-            var deposito = await context.Depositos.SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
-            if (deposito is null || !deposito.Activo) throw new BusinessException("El depósito no existe o está inactivo.");
-            var ids = request.Items.Select(x => x.ProductoId).ToArray();
-            var productos = await context.Productos.Include(x => x.UnidadMedidaCatalogo).Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
-            var compra = new Compra {
-                OperacionId = request.OperacionId, SolicitudHash = solicitudHash, ProveedorId = proveedor.Id,
-                Proveedor = proveedor, DepositoId = deposito.Id, Deposito = deposito,
-                Observaciones = request.Observaciones
-            };
-            foreach (var item in request.Items)
-            {
-                if (!productos.TryGetValue(item.ProductoId, out var producto) || !producto.Activo) throw new BusinessException("Un producto no existe o está inactivo.");
-                var subtotal = CompraReglas.Subtotal(item.Cantidad, item.CostoUnitario, producto.UnidadMedidaCatalogo.Codigo);
-                compra.Detalles.Add(new CompraDetalle { ProductoId = producto.Id, Producto = producto,
-                    UnidadMedida = producto.UnidadMedidaCatalogo.Codigo,
-                    Cantidad = item.Cantidad, CostoUnitario = item.CostoUnitario, Subtotal = subtotal });
-                compra.Total += subtotal;
-            }
-            if (compra.Total > CompraReglas.MaximoImporte) throw new BusinessException("El total de la compra supera el máximo permitido.");
+            var compra = new Compra { OperacionId = request.OperacionId, SolicitudHash = solicitudHash };
+            await AplicarDatosAsync(compra, request, ct);
             context.Compras.Add(compra);
             await context.SaveChangesAsync(ct);
             return Map(compra);
         }, ct);
+
+    public Task<CompraDto> EditarAsync(int id, CompraDatosRequest datos, Guid version, CancellationToken ct)
+        => TransaccionAsync(async () =>
+        {
+            Usuario();
+            var compra = await CargarAsync(id, ct);
+            if (compra.Estado != "Pendiente" || compra.Detalles.Any(x => x.MovimientoId != null))
+                throw new BusinessException("Solo se pueden editar compras pendientes sin movimientos.", 409);
+            CompraReglas.ValidarVersion(compra.Version, version);
+            await AplicarDatosAsync(compra, datos, ct);
+            // Cambiar la versión impide que una recepción o edición use datos anteriores.
+            compra.Version = Guid.NewGuid();
+            await context.SaveChangesAsync(ct);
+            return Map(compra);
+        }, ct);
+
+    private async Task AplicarDatosAsync(Compra compra, CompraDatosRequest request, CancellationToken ct)
+    {
+        var proveedor = await context.Proveedores.Include(x => x.TipoDocumento).SingleOrDefaultAsync(x => x.Id == request.ProveedorId, ct);
+        if (proveedor is null || !proveedor.Activo) throw new BusinessException("El proveedor no existe o está inactivo.");
+        var deposito = await context.Depositos.SingleOrDefaultAsync(x => x.Id == request.DepositoId, ct);
+        if (deposito is null || !deposito.Activo) throw new BusinessException("El depósito no existe o está inactivo.");
+        var ids = request.Items.Select(x => x.ProductoId).ToArray();
+        var productos = await context.Productos.Include(x => x.UnidadMedidaCatalogo).Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        compra.ProveedorId = proveedor.Id;
+        compra.Proveedor = proveedor;
+        compra.DepositoId = deposito.Id;
+        compra.Deposito = deposito;
+        compra.Observaciones = request.Observaciones;
+
+        // Actualizar las líneas que siguen presentes conserva sus ID y su auditoría.
+        var existentes = compra.Detalles.ToDictionary(x => x.ProductoId);
+        foreach (var vieja in compra.Detalles.Where(x => !ids.Contains(x.ProductoId)).ToArray())
+        {
+            context.Remove(vieja);
+            compra.Detalles.Remove(vieja);
+        }
+        compra.Total = 0;
+        foreach (var item in request.Items)
+        {
+            if (!productos.TryGetValue(item.ProductoId, out var producto) || !producto.Activo)
+                throw new BusinessException("Un producto no existe o está inactivo.");
+            var unidad = producto.UnidadMedidaCatalogo.Codigo;
+            var subtotal = CompraReglas.Subtotal(item.Cantidad, item.CostoUnitario, unidad);
+            if (!existentes.TryGetValue(item.ProductoId, out var detalle))
+            {
+                detalle = new CompraDetalle { ProductoId = producto.Id, Producto = producto, UnidadMedida = unidad };
+                compra.Detalles.Add(detalle);
+            }
+            detalle.UnidadMedida = unidad;
+            detalle.Cantidad = item.Cantidad;
+            detalle.CostoUnitario = item.CostoUnitario;
+            detalle.Subtotal = subtotal;
+            compra.Total += subtotal;
+        }
+        if (compra.Total > CompraReglas.MaximoImporte) throw new BusinessException("El total de la compra supera el máximo permitido.");
+    }
 
     public Task<CompraDto> RecibirAsync(int id, Guid version, CancellationToken ct)
         => TransaccionAsync(async () =>

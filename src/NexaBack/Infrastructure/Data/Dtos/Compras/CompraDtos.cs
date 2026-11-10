@@ -1,7 +1,11 @@
 namespace NexaBack.Infrastructure.Data.Dtos.Compras;
 
 public sealed record CompraLineaEntrada(int ProductoId, decimal Cantidad, decimal CostoUnitario);
-public sealed record CrearCompraRequest(Guid OperacionId, int ProveedorId, int DepositoId, string? Observaciones, IReadOnlyList<CompraLineaEntrada> Items);
+public record CompraDatosRequest(int ProveedorId, int DepositoId, string? Observaciones, IReadOnlyList<CompraLineaEntrada> Items);
+public sealed record CrearCompraRequest(Guid OperacionId, int ProveedorId, int DepositoId, string? Observaciones, IReadOnlyList<CompraLineaEntrada> Items)
+    : CompraDatosRequest(ProveedorId, DepositoId, Observaciones, Items);
+public sealed record EditarCompraRequest(Guid Version, int ProveedorId, int DepositoId, string? Observaciones, IReadOnlyList<CompraLineaEntrada> Items)
+    : CompraDatosRequest(ProveedorId, DepositoId, Observaciones, Items);
 public sealed record CompraEstadoRequest(Guid Version);
 public sealed record CompraResumenDto(int Id, string Numero, string ProveedorNombre, string? ProveedorTipoDocumento, string? ProveedorDocumento, string DepositoNombre,
     string Estado, decimal Total, Guid Version, DateTime CreadoEn);

@@ -6,6 +6,7 @@ public interface ICompraService
     Task<ComprasPaginaDto> ListarAsync(int pagina, int tamanoPagina, string? buscar, string? estado, CancellationToken ct);
     Task<CompraDto> ObtenerAsync(int id, CancellationToken ct);
     Task<CompraDto> CrearAsync(CrearCompraRequest request, CancellationToken ct);
+    Task<CompraDto> EditarAsync(int id, EditarCompraRequest request, CancellationToken ct);
     Task<CompraDto> RecibirAsync(int id, CompraEstadoRequest request, CancellationToken ct);
     Task<CompraDto> CancelarAsync(int id, CompraEstadoRequest request, CancellationToken ct);
     Task<IReadOnlyList<CompraProveedorDto>> ProveedoresAsync(string buscar, CancellationToken ct);
