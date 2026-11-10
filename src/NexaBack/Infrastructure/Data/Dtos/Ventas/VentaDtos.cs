@@ -1,3 +1,4 @@
+using NexaBack.Infrastructure.Data.Dtos.Auditoria;
 namespace NexaBack.Infrastructure.Data.Dtos.Ventas;
 public sealed record VentaLineaSolicitud(int ProductoId, decimal Cantidad);
 public sealed record VentaCotizarRequest(int ClienteId, int DepositoId, decimal Descuento, IReadOnlyList<VentaLineaSolicitud> Items);
@@ -15,7 +16,10 @@ public sealed record VentaLineaDto(int Id, int ProductoId, string ProductoCodigo
 public sealed record VentaDto(int Id, string Numero, int ClienteId, string ClienteNombre, string? ClienteTipoDocumento,
     string ClienteDocumento, int DepositoId, string DepositoNombre, string Estado, string? Observaciones,
     decimal Subtotal, decimal Descuento, decimal Total, Guid Version, DateTime? AnuladaEn, string? MotivoAnulacion,
-    DateTime CreadoEn, int? CreadoPor, DateTime? ModificadoEn, int? ModificadoPor, IReadOnlyList<VentaLineaDto> Items);
+    DateTime CreadoEn, int? CreadoPor, DateTime? ModificadoEn, int? ModificadoPor, IReadOnlyList<VentaLineaDto> Items) : IAuditoriaVisible
+{
+    public AuditoriaNombres? NombresAuditoria { get; set; }
+}
 public sealed record VentasPaginaDto(IReadOnlyList<VentaResumenDto> Items, int Total, int Pagina, int TamanoPagina);
 public sealed record VentaClienteDto(int Id, string Nombre, string? TipoDocumento, string Documento);
 public sealed record VentaDepositoDto(int Id, string Nombre);

@@ -1,3 +1,4 @@
+using NexaBack.Infrastructure.Data.Dtos.Auditoria;
 using NexaBack.Infrastructure.Data.Dtos.Ventas;
 namespace NexaBack.Infrastructure.Data.Dtos.Presupuestos;
 
@@ -16,5 +17,8 @@ public sealed record PresupuestoDto(int Id, string Numero, int ClienteId, string
     int DepositoId, string DepositoNombre, string Estado, bool Vencido, DateOnly FechaVencimiento, string? Observaciones,
     decimal Subtotal, decimal Descuento, decimal Total, Guid Version, DateTime? AprobadoEn, int? AprobadoPor,
     DateTime? CanceladoEn, string? MotivoCancelacion, int? VentaId, DateTime CreadoEn, int? CreadoPor,
-    DateTime? ModificadoEn, int? ModificadoPor, IReadOnlyList<PresupuestoLineaDto> Items);
+    DateTime? ModificadoEn, int? ModificadoPor, IReadOnlyList<PresupuestoLineaDto> Items) : IAuditoriaVisible
+{
+    public AuditoriaNombres? NombresAuditoria { get; set; }
+}
 public sealed record PresupuestosPaginaDto(IReadOnlyList<PresupuestoResumenDto> Items, int Total, int Pagina, int TamanoPagina);

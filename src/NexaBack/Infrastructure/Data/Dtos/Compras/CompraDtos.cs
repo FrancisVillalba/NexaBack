@@ -1,3 +1,4 @@
+using NexaBack.Infrastructure.Data.Dtos.Auditoria;
 namespace NexaBack.Infrastructure.Data.Dtos.Compras;
 
 public sealed record CompraLineaEntrada(int ProductoId, decimal Cantidad, decimal CostoUnitario);
@@ -13,7 +14,10 @@ public sealed record CompraLineaDto(int Id, int ProductoId, string ProductoCodig
     decimal Cantidad, decimal CostoUnitario, decimal Subtotal, int? MovimientoId);
 public sealed record CompraDto(int Id, string Numero, int ProveedorId, string ProveedorNombre, string? ProveedorTipoDocumento, string? ProveedorDocumento,
     int DepositoId, string DepositoNombre, string Estado, string? Observaciones, decimal Total, Guid Version, DateTime? RecibidoEn,
-    DateTime CreadoEn, int? CreadoPor, DateTime? ModificadoEn, int? ModificadoPor, IReadOnlyList<CompraLineaDto> Items);
+    DateTime CreadoEn, int? CreadoPor, DateTime? ModificadoEn, int? ModificadoPor, IReadOnlyList<CompraLineaDto> Items) : IAuditoriaVisible
+{
+    public AuditoriaNombres? NombresAuditoria { get; set; }
+}
 public sealed record ComprasPaginaDto(IReadOnlyList<CompraResumenDto> Items, int Total, int Pagina, int TamanoPagina);
 public sealed record CompraProveedorDto(int Id, string Nombre, string? TipoDocumento, string? Documento);
 public sealed record CompraProductoDto(int Id, string Codigo, string Nombre, string UnidadMedida, decimal Costo);

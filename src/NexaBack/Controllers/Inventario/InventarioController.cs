@@ -1,3 +1,4 @@
+using NexaBack.Infrastructure.Data.Context.Usuarios;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NexaBack.Infrastructure.Data.Dtos.Inventario;
@@ -8,7 +9,7 @@ namespace NexaBack.Controllers.Inventario;
 
 [ApiController, Authorize]
 [Route("api/inventario")]
-public sealed class InventarioController(IInventarioService service) : ControllerBase
+public sealed class InventarioController(IInventarioService service, UsuariosDbContext context) : ControllerBase
 {
     // Tanto consulta como registro requieren conocer los depósitos disponibles.
     [HttpGet("depositos")]
@@ -27,9 +28,13 @@ public sealed class InventarioController(IInventarioService service) : Controlle
     [HttpGet("movimientos"), RequireAccess("movimientos.ver")]
     public async Task<ActionResult<MovimientosPaginaDto>> Movimientos([FromQuery] int? depositoId = null, [FromQuery] int? productoId = null,
         [FromQuery] int pagina = 1, [FromQuery] int tamanoPagina = 20, [FromQuery] string? buscar = null, CancellationToken ct = default)
-        => Ok(await service.MovimientosAsync(depositoId, productoId, pagina, tamanoPagina, buscar, ct));
+    {
+        var resultado = await service.MovimientosAsync(depositoId, productoId, pagina, tamanoPagina, buscar, ct);
+        await context.CompletarNombresAsync(resultado.Items, ct);
+        return Ok(resultado);
+    }
 
     [HttpPost("movimientos"), RequireAccess("movimientos.crear")]
     public async Task<ActionResult<MovimientoDto>> Registrar(RegistrarMovimientoRequest request, CancellationToken ct)
-        => Ok(await service.RegistrarAsync(request, ct));
+        => Ok(await context.ConNombresAsync(await service.RegistrarAsync(request, ct), ct));
 }
