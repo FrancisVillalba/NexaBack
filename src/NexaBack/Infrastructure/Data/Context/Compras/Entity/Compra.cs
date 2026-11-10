@@ -1,20 +1,20 @@
 using NexaBack.Infrastructure.Persistence;
+using NexaBack.Infrastructure.Data.Context.Comercial.Entity;
+using NexaBack.Infrastructure.Data.Context.Productos.Entity;
 using NexaBack.Infrastructure.Data.Context.Inventario.Entity;
 
 namespace NexaBack.Infrastructure.Data.Context.Compras.Entity;
 
-// La orden conserva una copia de los nombres y precios acordados, aunque luego cambie el catálogo.
+// Los nombres se consultan por sus relaciones; los importes y la unidad acordada pertenecen a la compra.
 public sealed class Compra : IEntidadAuditable
 {
     public int Id { get; set; }
     public Guid OperacionId { get; set; }
     public required string SolicitudHash { get; set; }
     public int ProveedorId { get; set; }
-    public required string ProveedorNombre { get; set; }
-    public string? ProveedorTipoDocumento { get; set; }
-    public string? ProveedorDocumento { get; set; }
+    public Proveedor Proveedor { get; set; } = null!;
     public int DepositoId { get; set; }
-    public required string DepositoNombre { get; set; }
+    public Deposito Deposito { get; set; } = null!;
     public string Estado { get; set; } = "Pendiente";
     public string? Observaciones { get; set; }
     public decimal Total { get; set; }
@@ -33,8 +33,7 @@ public sealed class CompraDetalle : IEntidadAuditable
     public int CompraId { get; set; }
     public Compra Compra { get; set; } = null!;
     public int ProductoId { get; set; }
-    public required string ProductoCodigo { get; set; }
-    public required string ProductoNombre { get; set; }
+    public Producto Producto { get; set; } = null!;
     public required string UnidadMedida { get; set; }
     public decimal Cantidad { get; set; }
     public decimal CostoUnitario { get; set; }

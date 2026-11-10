@@ -15,22 +15,22 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
 {
     public async Task<VentasPaginaDto> ListarAsync(int pagina, int tamanoPagina, string? buscar, string? estado, CancellationToken ct)
     {
-        var query = context.Ventas.AsNoTracking();
+        var query = DatosVenta().AsNoTracking();
         if (estado is not null) query = query.Where(x => x.Estado == estado);
         if (!string.IsNullOrEmpty(buscar))
         {
             var patron = Patron(buscar);
-            query = query.Where(x => EF.Functions.ILike(x.ClienteNombre, patron, "\\")
-                || EF.Functions.ILike(x.ClienteDocumento, patron, "\\") || EF.Functions.ILike(x.DepositoNombre, patron, "\\")
+            query = query.Where(x => EF.Functions.ILike(x.Cliente.NombreRazonSocial, patron, "\\")
+                || EF.Functions.ILike(x.Cliente.Documento, patron, "\\") || EF.Functions.ILike(x.Deposito.Nombre, patron, "\\")
                 || EF.Functions.ILike("VTA-" + x.Id.ToString().PadLeft(6, '0'), patron, "\\"));
         }
         var total = await query.CountAsync(ct);
         var filas = await query.OrderByDescending(x => x.Id).Skip((pagina - 1) * tamanoPagina).Take(tamanoPagina).ToListAsync(ct);
-        return new(filas.Select(x => new VentaResumenDto(x.Id, Numero(x.Id), x.ClienteNombre, x.ClienteTipoDocumento,
-            x.ClienteDocumento, x.DepositoNombre, x.Estado, x.Total, x.Version, x.CreadoEn)).ToArray(), total, pagina, tamanoPagina);
+        return new(filas.Select(x => new VentaResumenDto(x.Id, Numero(x.Id), x.Cliente.NombreRazonSocial, x.Cliente.TipoDocumento?.Nombre,
+            x.Cliente.Documento, x.Deposito.Nombre, x.Estado, x.Total, x.Version, x.CreadoEn)).ToArray(), total, pagina, tamanoPagina);
     }
     public async Task<VentaDto> ObtenerAsync(int id, CancellationToken ct)
-        => Map(await context.Ventas.AsNoTracking().Include(x => x.Detalles).SingleOrDefaultAsync(x => x.Id == id, ct)
+        => Map(await DatosVenta(true).AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new BusinessException("Venta no encontrada.", 404));
 
     public async Task<VentaCotizacionDto> CotizarAsync(VentaCotizarRequest request, CancellationToken ct)
@@ -68,7 +68,7 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
             // Otro reintento pudo confirmar el mismo UUID mientras esta transacción esperaba.
             // La transacción anterior ya se descartó: consultar el resultado confirmado sin repetir salidas.
             context.ChangeTracker.Clear();
-            var existente = await context.Ventas.AsNoTracking().Include(x => x.Detalles).SingleOrDefaultAsync(x => x.OperacionId == request.OperacionId, ct);
+            var existente = await DatosVenta(true).AsNoTracking().SingleOrDefaultAsync(x => x.OperacionId == request.OperacionId, ct);
             if (existente is null) throw;
             if (existente.SolicitudHash != hash || existente.CreadoPor != Usuario())
                 throw new BusinessException("Ese identificador de operación ya se utilizó con otros datos.", 409);
@@ -80,7 +80,7 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
         => TransaccionAsync(async () =>
         {
             var usuario = Usuario();
-            var anterior = await context.Ventas.Include(x => x.Detalles).SingleOrDefaultAsync(x => x.OperacionId == request.OperacionId, ct);
+            var anterior = await DatosVenta(true).SingleOrDefaultAsync(x => x.OperacionId == request.OperacionId, ct);
             if (anterior is not null)
             {
                 if (anterior.SolicitudHash != hash || anterior.CreadoPor != usuario) throw new BusinessException("Ese identificador de operación ya se utilizó con otros datos.", 409);
@@ -94,8 +94,8 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
             var productos = await context.Productos.Include(x => x.UnidadMedidaCatalogo).Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
             var saldos = await context.Existencias.Where(x => x.DepositoId == request.DepositoId && ids.Contains(x.ProductoId)).ToDictionaryAsync(x => x.ProductoId, ct);
             var venta = new Venta { OperacionId = request.OperacionId, SolicitudHash = hash, ClienteId = cliente.Id,
-                ClienteNombre = cliente.NombreRazonSocial, ClienteTipoDocumento = cliente.TipoDocumento == null ? null : cliente.TipoDocumento.Nombre, ClienteDocumento = cliente.Documento,
-                DepositoId = deposito.Id, DepositoNombre = deposito.Nombre, Descuento = request.Descuento, Observaciones = request.Observaciones };
+                Cliente = cliente,
+                DepositoId = deposito.Id, Deposito = deposito, Descuento = request.Descuento, Observaciones = request.Observaciones };
             foreach (var item in request.Items)
             {
                 if (!productos.TryGetValue(item.ProductoId, out var producto) || !producto.Activo) throw new BusinessException("Un producto no existe o está inactivo.");
@@ -108,8 +108,7 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
                     Motivo = "Venta (operación " + request.OperacionId + ")" };
                 // La salida, el saldo y la venta se persisten juntos. El detalle referencia el movimiento.
                 context.MovimientosInventario.Add(movimiento);
-                venta.Detalles.Add(new VentaDetalle { ProductoId = producto.Id, ProductoCodigo = producto.Codigo,
-                    ProductoNombre = producto.Nombre, UnidadMedida = producto.UnidadMedidaCatalogo.Codigo, Cantidad = item.Cantidad,
+                venta.Detalles.Add(new VentaDetalle { ProductoId = producto.Id, Producto = producto, UnidadMedida = producto.UnidadMedidaCatalogo.Codigo, Cantidad = item.Cantidad,
                     PrecioUnitario = producto.PrecioVenta, CostoUnitario = producto.Costo, Subtotal = subtotal, MovimientoSalida = movimiento });
                 venta.Subtotal += subtotal;
                 saldo.Cantidad = nuevo;
@@ -128,7 +127,7 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
         => TransaccionAsync(async () =>
         {
             Usuario();
-            var venta = await context.Ventas.Include(x => x.Detalles).SingleOrDefaultAsync(x => x.Id == id, ct)
+            var venta = await DatosVenta(true).SingleOrDefaultAsync(x => x.Id == id, ct)
                 ?? throw new BusinessException("Venta no encontrada.", 404);
             if (venta.Estado == "Anulada")
             {
@@ -206,8 +205,15 @@ public sealed class VentaRepository(UsuariosDbContext context) : IVentaRepositor
     }
     private static string Numero(int id) => $"VTA-{id:D6}";
     private static string Patron(string texto) => "%" + texto.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
-    private static VentaDto Map(Venta x) => new(x.Id, Numero(x.Id), x.ClienteId, x.ClienteNombre, x.ClienteTipoDocumento, x.ClienteDocumento,
-        x.DepositoId, x.DepositoNombre, x.Estado, x.Observaciones, x.Subtotal, x.Descuento, x.Total, x.Version, x.AnuladaEn, x.MotivoAnulacion,
+    // Los nombres se leen de sus tablas por ID; el listado no necesita cargar las líneas.
+    private IQueryable<Venta> DatosVenta(bool incluirDetalles = false)
+    {
+        var consulta = context.Ventas.Include(x => x.Cliente).ThenInclude(x => x.TipoDocumento).Include(x => x.Deposito);
+        return incluirDetalles ? consulta.Include(x => x.Detalles).ThenInclude(x => x.Producto) : consulta;
+    }
+
+    private static VentaDto Map(Venta x) => new(x.Id, Numero(x.Id), x.ClienteId, x.Cliente.NombreRazonSocial, x.Cliente.TipoDocumento?.Nombre, x.Cliente.Documento,
+        x.DepositoId, x.Deposito.Nombre, x.Estado, x.Observaciones, x.Subtotal, x.Descuento, x.Total, x.Version, x.AnuladaEn, x.MotivoAnulacion,
         x.CreadoEn, x.CreadoPor, x.ModificadoEn, x.ModificadoPor, x.Detalles.OrderBy(d => d.Id).Select(d => new VentaLineaDto(d.Id, d.ProductoId,
-            d.ProductoCodigo, d.ProductoNombre, d.UnidadMedida, d.Cantidad, d.PrecioUnitario, d.Subtotal, d.MovimientoSalidaId, d.MovimientoAnulacionId)).ToArray());
+            d.Producto.Codigo, d.Producto.Nombre, d.UnidadMedida, d.Cantidad, d.PrecioUnitario, d.Subtotal, d.MovimientoSalidaId, d.MovimientoAnulacionId)).ToArray());
 }

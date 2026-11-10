@@ -97,7 +97,7 @@ public sealed class ReportesRepository(UsuariosDbContext context) : IReportesRep
         var ids = VentasPeriodo(q).Select(x => x.Id);
         var lineas = context.VentasDetalles.AsNoTracking().Where(x => ids.Contains(x.VentaId));
         var costo = await lineas.SumAsync(x => (decimal?)(x.Cantidad * x.CostoUnitario), ct) ?? 0m;
-        var productos = await lineas.GroupBy(x => new { x.ProductoId, x.ProductoCodigo, x.ProductoNombre, x.UnidadMedida })
+        var productos = await lineas.GroupBy(x => new { x.ProductoId, ProductoCodigo = x.Producto.Codigo, ProductoNombre = x.Producto.Nombre, x.UnidadMedida })
             .Select(g => new { g.Key, Cantidad = g.Sum(x => x.Cantidad), Bruto = g.Sum(x => x.Subtotal) })
             .OrderByDescending(x => x.Bruto).ThenBy(x => x.Key.ProductoId).Take(5)
             .Select(x => new ReporteProductoDto(x.Key.ProductoId, x.Key.ProductoCodigo, x.Key.ProductoNombre, x.Key.UnidadMedida, x.Cantidad, x.Bruto)).ToListAsync(ct);
@@ -124,19 +124,19 @@ public sealed class ReportesRepository(UsuariosDbContext context) : IReportesRep
             case "ventas":
                 return ventas.Where(x => x.CreadoEn >= inicio && x.CreadoEn < fin)
                     .Select(x => new { Venta = x, Aplicado = context.Cobros.Where(c => c.VentaId == x.Id && c.Estado == "Vigente").Sum(c => (decimal?)c.Importe) ?? 0m })
-                    .Select(x => new ReporteFilaDto { Id = x.Venta.Id, Referencia = "VTA-" + x.Venta.Id.ToString().PadLeft(6, '0'), Fecha = x.Venta.CreadoEn, Nombre = x.Venta.ClienteNombre, Estado = x.Venta.Estado, Importe = x.Venta.Total, Aplicado = x.Aplicado, Saldo = x.Venta.Total - x.Aplicado, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
+                    .Select(x => new ReporteFilaDto { Id = x.Venta.Id, Referencia = "VTA-" + x.Venta.Id.ToString().PadLeft(6, '0'), Fecha = x.Venta.CreadoEn, Nombre = x.Venta.Cliente.NombreRazonSocial, Estado = x.Venta.Estado, Importe = x.Venta.Total, Aplicado = x.Aplicado, Saldo = x.Venta.Total - x.Aplicado, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
             case "compras":
                 return compras.Where(x => x.RecibidoEn >= inicio && x.RecibidoEn < fin)
                     .Select(x => new { Compra = x, Aplicado = context.Pagos.Where(p => p.CompraId == x.Id && p.Estado == "Vigente").Sum(p => (decimal?)p.Importe) ?? 0m })
-                    .Select(x => new ReporteFilaDto { Id = x.Compra.Id, Referencia = "OC-" + x.Compra.Id.ToString().PadLeft(6, '0'), Fecha = x.Compra.RecibidoEn, Nombre = x.Compra.ProveedorNombre, Estado = x.Compra.Estado, Importe = x.Compra.Total, Aplicado = x.Aplicado, Saldo = x.Compra.Total - x.Aplicado, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
+                    .Select(x => new ReporteFilaDto { Id = x.Compra.Id, Referencia = "OC-" + x.Compra.Id.ToString().PadLeft(6, '0'), Fecha = x.Compra.RecibidoEn, Nombre = x.Compra.Proveedor.NombreRazonSocial, Estado = x.Compra.Estado, Importe = x.Compra.Total, Aplicado = x.Aplicado, Saldo = x.Compra.Total - x.Aplicado, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
             case "cobros":
                 return context.Cobros.AsNoTracking().Where(x => x.Estado == "Vigente" && x.Venta.Estado == "Confirmada" && x.FechaCobro >= q.Desde && x.FechaCobro <= q.Hasta
                     && (!q.DepositoId.HasValue || x.Venta.DepositoId == q.DepositoId))
-                    .Select(x => new ReporteFilaDto { Id = x.Id, Referencia = "COB-" + x.Id.ToString().PadLeft(6, '0') + " / VTA-" + x.VentaId.ToString().PadLeft(6, '0'), Fecha = x.FechaCobro.ToDateTime(TimeOnly.MinValue), Nombre = x.Venta.ClienteNombre, Estado = x.MedioPago, Importe = x.Importe, Aplicado = 0, Saldo = 0, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
+                    .Select(x => new ReporteFilaDto { Id = x.Id, Referencia = "COB-" + x.Id.ToString().PadLeft(6, '0') + " / VTA-" + x.VentaId.ToString().PadLeft(6, '0'), Fecha = x.FechaCobro.ToDateTime(TimeOnly.MinValue), Nombre = x.Venta.Cliente.NombreRazonSocial, Estado = x.MedioPago, Importe = x.Importe, Aplicado = 0, Saldo = 0, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
             case "pagos":
                 return context.Pagos.AsNoTracking().Where(x => x.Estado == "Vigente" && x.Compra.Estado == "Recibida" && x.FechaPago >= q.Desde && x.FechaPago <= q.Hasta
                     && (!q.DepositoId.HasValue || x.Compra.DepositoId == q.DepositoId))
-                    .Select(x => new ReporteFilaDto { Id = x.Id, Referencia = "PAG-" + x.Id.ToString().PadLeft(6, '0') + " / OC-" + x.CompraId.ToString().PadLeft(6, '0'), Fecha = x.FechaPago.ToDateTime(TimeOnly.MinValue), Nombre = x.Compra.ProveedorNombre, Estado = x.MedioPago, Importe = x.Importe, Aplicado = 0, Saldo = 0, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
+                    .Select(x => new ReporteFilaDto { Id = x.Id, Referencia = "PAG-" + x.Id.ToString().PadLeft(6, '0') + " / OC-" + x.CompraId.ToString().PadLeft(6, '0'), Fecha = x.FechaPago.ToDateTime(TimeOnly.MinValue), Nombre = x.Compra.Proveedor.NombreRazonSocial, Estado = x.MedioPago, Importe = x.Importe, Aplicado = 0, Saldo = 0, Cantidad = null, Unidad = null, Costo = null, Minimo = null });
             case "inventario": return Inventario(q.DepositoId, false);
             case "por-cobrar":
                 return ventas.Select(x => new { x.ClienteId, x.Total, Aplicado = context.Cobros.Where(c => c.VentaId == x.Id && c.Estado == "Vigente").Sum(c => (decimal?)c.Importe) ?? 0m })

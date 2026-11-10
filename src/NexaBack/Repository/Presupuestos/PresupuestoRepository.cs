@@ -16,19 +16,19 @@ public sealed class PresupuestoRepository(UsuariosDbContext context, IVentaRepos
     public async Task<PresupuestosPaginaDto> ListarAsync(int pagina, int tamanoPagina, string? buscar, string? estado, CancellationToken ct)
     {
         var hoy = PresupuestoReglas.Hoy;
-        var q = context.Presupuestos.AsNoTracking();
+        var q = DatosPresupuesto().AsNoTracking();
         if (estado == "Vencido") q = q.Where(x => (x.Estado == "Borrador" || x.Estado == "Aprobado") && x.FechaVencimiento < hoy);
         else if (estado is not null) q = q.Where(x => x.Estado == estado);
         if (!string.IsNullOrEmpty(buscar))
         {
             var patron = Patron(buscar);
-            q = q.Where(x => EF.Functions.ILike(x.ClienteNombre, patron, "\\") || EF.Functions.ILike(x.ClienteDocumento, patron, "\\")
+            q = q.Where(x => EF.Functions.ILike(x.Cliente.NombreRazonSocial, patron, "\\") || EF.Functions.ILike(x.Cliente.Documento, patron, "\\")
                 || EF.Functions.ILike("PRE-" + x.Id.ToString().PadLeft(6, '0'), patron, "\\"));
         }
         var total = await q.CountAsync(ct);
         var filas = await q.OrderByDescending(x => x.Id).Skip((pagina - 1) * tamanoPagina).Take(tamanoPagina).ToListAsync(ct);
-        return new(filas.Select(x => new PresupuestoResumenDto(x.Id, Numero(x.Id), x.ClienteNombre, x.ClienteTipoDocumento, x.ClienteDocumento,
-            x.DepositoNombre, x.Estado, PresupuestoReglas.Vencido(x.Estado, x.FechaVencimiento, hoy), x.FechaVencimiento, x.Total, x.Version, x.CreadoEn, x.VentaId)).ToArray(), total, pagina, tamanoPagina);
+        return new(filas.Select(x => new PresupuestoResumenDto(x.Id, Numero(x.Id), x.Cliente.NombreRazonSocial, x.Cliente.TipoDocumento?.Nombre, x.Cliente.Documento,
+            x.Deposito.Nombre, x.Estado, PresupuestoReglas.Vencido(x.Estado, x.FechaVencimiento, hoy), x.FechaVencimiento, x.Total, x.Version, x.CreadoEn, x.VentaId)).ToArray(), total, pagina, tamanoPagina);
     }
     public async Task<PresupuestoDto> ObtenerAsync(int id, CancellationToken ct) => Map(await Cargar(id, false, ct));
 
@@ -71,9 +71,9 @@ public sealed class PresupuestoRepository(UsuariosDbContext context, IVentaRepos
                 }
                 else
                 {
-                    var anterior = await context.Presupuestos.Include(x => x.Detalles).SingleOrDefaultAsync(x => x.OperacionId == request.OperacionId, ct);
+                    var anterior = await DatosPresupuesto(true).SingleOrDefaultAsync(x => x.OperacionId == request.OperacionId, ct);
                     if (anterior is not null) { Reintento(anterior.SolicitudHash, hash, anterior.CreadoPor, usuario); return Map(anterior); }
-                    p = new Presupuesto { OperacionId = request.OperacionId, SolicitudHash = hash, ClienteNombre = "", ClienteDocumento = "", DepositoNombre = "" };
+                    p = new Presupuesto { OperacionId = request.OperacionId, SolicitudHash = hash };
                     context.Presupuestos.Add(p);
                 }
                 PresupuestoReglas.Fecha(request.FechaVencimiento, PresupuestoReglas.Hoy);
@@ -82,9 +82,8 @@ public sealed class PresupuestoRepository(UsuariosDbContext context, IVentaRepos
                 foreach (var linea in calculo.Items)
                     if (request.Items.Single(x => x.ProductoId == linea.ProductoId).VersionProducto != linea.VersionProducto)
                         throw new BusinessException("Cambió un producto. Calculá nuevamente y revisá los precios antes de guardar.", 409);
-                var cliente = await context.Clientes.AsNoTracking().Include(x => x.TipoDocumento).SingleAsync(x => x.Id == request.ClienteId, ct);
-                p.ClienteId = cliente.Id; p.ClienteNombre = cliente.NombreRazonSocial; p.ClienteDocumento = cliente.Documento; p.ClienteTipoDocumento = cliente.TipoDocumento?.Nombre;
-                p.DepositoId = calculo.DepositoId; p.DepositoNombre = calculo.DepositoNombre; p.FechaVencimiento = request.FechaVencimiento;
+                p.ClienteId = request.ClienteId;
+                p.DepositoId = calculo.DepositoId; p.FechaVencimiento = request.FechaVencimiento;
                 p.Observaciones = request.Observaciones; p.Subtotal = calculo.Subtotal; p.Descuento = calculo.Descuento; p.Total = calculo.Total; p.Version = Guid.NewGuid();
                 if (id.HasValue) { p.EdicionOperacionId = request.OperacionId; p.EdicionHash = hash; }
                 // Conservar las líneas existentes mantiene su auditoría original al editar el borrador.
@@ -95,19 +94,19 @@ public sealed class PresupuestoRepository(UsuariosDbContext context, IVentaRepos
                 foreach (var linea in calculo.Items)
                 {
                     var detalle = p.Detalles.SingleOrDefault(x => x.ProductoId == linea.ProductoId);
-                    if (detalle is null) { detalle = new PresupuestoDetalle { ProductoId = linea.ProductoId, ProductoCodigo = "", ProductoNombre = "", UnidadMedida = "" }; p.Detalles.Add(detalle); }
-                    detalle.ProductoCodigo = linea.Codigo; detalle.ProductoNombre = linea.Nombre; detalle.UnidadMedida = linea.UnidadMedida;
+                    if (detalle is null) { detalle = new PresupuestoDetalle { ProductoId = linea.ProductoId, UnidadMedida = "" }; p.Detalles.Add(detalle); }
+                    detalle.UnidadMedida = linea.UnidadMedida;
                     detalle.Cantidad = linea.Cantidad; detalle.PrecioUnitario = linea.PrecioUnitario; detalle.Subtotal = linea.Subtotal;
                 }
                 await context.SaveChangesAsync(ct);
-                return Map(p);
+                return await ObtenerAsync(p.Id, ct);
             }, ct);
         }
         catch (BusinessException ex) when (ex.StatusCode == 409)
         {
             context.ChangeTracker.Clear();
-            var p = id.HasValue ? await context.Presupuestos.AsNoTracking().Include(x => x.Detalles).SingleOrDefaultAsync(x => x.Id == id, ct)
-                : await context.Presupuestos.AsNoTracking().Include(x => x.Detalles).SingleOrDefaultAsync(x => x.OperacionId == request.OperacionId, ct);
+            var p = id.HasValue ? await DatosPresupuesto(true).AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct)
+                : await DatosPresupuesto(true).AsNoTracking().SingleOrDefaultAsync(x => x.OperacionId == request.OperacionId, ct);
             if (p is null || id.HasValue && p.EdicionOperacionId != request.OperacionId) throw;
             Reintento(id.HasValue ? p.EdicionHash : p.SolicitudHash, hash, id.HasValue ? p.ModificadoPor : p.CreadoPor, Usuario());
             return Map(p);
@@ -184,7 +183,7 @@ public sealed class PresupuestoRepository(UsuariosDbContext context, IVentaRepos
     }
     private async Task<Presupuesto> Cargar(int id, bool seguimiento, CancellationToken ct)
     {
-        var q = context.Presupuestos.Include(x => x.Detalles).AsQueryable();
+        var q = DatosPresupuesto(true).AsQueryable();
         if (!seguimiento) q = q.AsNoTracking();
         return await q.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new BusinessException("Presupuesto no encontrado.", 404);
     }
@@ -206,9 +205,16 @@ public sealed class PresupuestoRepository(UsuariosDbContext context, IVentaRepos
     }
     private static string Numero(int id) => "PRE-" + id.ToString("D6");
     private static string Patron(string texto) => "%" + texto.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
-    private static PresupuestoDto Map(Presupuesto x) => new(x.Id, Numero(x.Id), x.ClienteId, x.ClienteNombre, x.ClienteTipoDocumento, x.ClienteDocumento,
-        x.DepositoId, x.DepositoNombre, x.Estado, PresupuestoReglas.Vencido(x.Estado, x.FechaVencimiento, PresupuestoReglas.Hoy), x.FechaVencimiento, x.Observaciones,
+    // Los nombres se leen de sus tablas por ID; el listado no necesita cargar las líneas.
+    private IQueryable<Presupuesto> DatosPresupuesto(bool incluirDetalles = false)
+    {
+        var consulta = context.Presupuestos.Include(x => x.Cliente).ThenInclude(x => x.TipoDocumento).Include(x => x.Deposito);
+        return incluirDetalles ? consulta.Include(x => x.Detalles).ThenInclude(x => x.Producto) : consulta;
+    }
+
+    private static PresupuestoDto Map(Presupuesto x) => new(x.Id, Numero(x.Id), x.ClienteId, x.Cliente.NombreRazonSocial, x.Cliente.TipoDocumento?.Nombre, x.Cliente.Documento,
+        x.DepositoId, x.Deposito.Nombre, x.Estado, PresupuestoReglas.Vencido(x.Estado, x.FechaVencimiento, PresupuestoReglas.Hoy), x.FechaVencimiento, x.Observaciones,
         x.Subtotal, x.Descuento, x.Total, x.Version, x.AprobadoEn, x.AprobadoPor, x.CanceladoEn, x.MotivoCancelacion, x.VentaId,
-        x.CreadoEn, x.CreadoPor, x.ModificadoEn, x.ModificadoPor, x.Detalles.OrderBy(d => d.Id).Select(d => new PresupuestoLineaDto(d.Id, d.ProductoId, d.ProductoCodigo, d.ProductoNombre,
+        x.CreadoEn, x.CreadoPor, x.ModificadoEn, x.ModificadoPor, x.Detalles.OrderBy(d => d.Id).Select(d => new PresupuestoLineaDto(d.Id, d.ProductoId, d.Producto.Codigo, d.Producto.Nombre,
             d.UnidadMedida, d.Cantidad, d.PrecioUnitario, d.Subtotal)).ToArray());
 }

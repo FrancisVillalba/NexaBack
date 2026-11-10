@@ -28,17 +28,13 @@ public sealed class PresupuestoConfiguration : IEntityTypeConfiguration<Presupue
         b.HasIndex(x => new { x.Estado, x.CreadoEn });
         b.Property(x => x.SolicitudHash).HasMaxLength(64);
         b.Property(x => x.EdicionHash).HasMaxLength(64);
-        b.Property(x => x.ClienteNombre).HasMaxLength(300);
-        b.Property(x => x.ClienteTipoDocumento).HasMaxLength(100);
-        b.Property(x => x.ClienteDocumento).HasMaxLength(30);
-        b.Property(x => x.DepositoNombre).HasMaxLength(100);
         b.Property(x => x.Estado).HasMaxLength(20);
         b.Property(x => x.Observaciones).HasMaxLength(500);
         b.Property(x => x.MotivoCancelacion).HasMaxLength(300);
         foreach (var campo in new[] { "Subtotal", "Descuento", "Total" }) b.Property(campo).HasPrecision(14, 2);
         b.Property(x => x.Version).IsConcurrencyToken();
-        b.HasOne<Cliente>().WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
-        b.HasOne<Deposito>().WithMany().HasForeignKey(x => x.DepositoId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Deposito).WithMany().HasForeignKey(x => x.DepositoId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Usuario>().WithMany().HasForeignKey(x => x.AprobadoPor).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Venta).WithMany().HasForeignKey(x => x.VentaId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Detalles).WithOne(x => x.Presupuesto).HasForeignKey(x => x.PresupuestoId).OnDelete(DeleteBehavior.Restrict);
@@ -58,12 +54,10 @@ public sealed class PresupuestoDetalleConfiguration : IEntityTypeConfiguration<P
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).UseIdentityByDefaultColumn();
         b.HasIndex(x => new { x.PresupuestoId, x.ProductoId }).IsUnique();
-        b.Property(x => x.ProductoCodigo).HasMaxLength(50);
-        b.Property(x => x.ProductoNombre).HasMaxLength(150);
         b.Property(x => x.UnidadMedida).HasMaxLength(20);
         b.Property(x => x.Cantidad).HasPrecision(14, 3);
         b.Property(x => x.PrecioUnitario).HasPrecision(14, 2);
         b.Property(x => x.Subtotal).HasPrecision(14, 2);
-        b.HasOne<Producto>().WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Producto).WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
     }
 }

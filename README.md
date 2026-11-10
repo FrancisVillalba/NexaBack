@@ -340,3 +340,12 @@ Administración → Categorías permite crear, editar, buscar por nombre o descr
 El mantenimiento usa `/api/categorias` y permisos `categorias.ver`, `categorias.crear`, `categorias.editar`, `categorias.estado`, restringidos al administrador. Reiniciar el backend, volver a iniciar sesión para cargar los permisos y recargar el frontend después de ejecutar el SQL. El operador conserva la consulta del selector mediante los permisos de Productos; no recibe acceso administrativo.
 
 El selector de Productos se actualiza al abrir el formulario, recuperar el foco o recibir una confirmación de cambio del ABM. Una categoría inactiva puede conservarse en un producto existente, pero no asignarse a uno nuevo. Renombrar una categoría actualiza su etiqueta en los productos asociados sin cambiar sus IDs.
+
+
+### Compras: datos consultados por ID
+
+Aplicar manualmente `src/NexaBack/Infrastructure/Persistence/Sql/Compras_Consultar_Datos_Por_Id.sql` con backup y el backend detenido, antes de iniciar esta version. El script no se ejecuta automaticamente.
+
+Compras y sus detalles ya no almacenan copias del nombre/documento/tipo de documento del proveedor, nombre del deposito ni nombre/codigo del producto. Se consultan las relaciones por ProveedorId, DepositoId y ProductoId en listado, detalle, busqueda, documentos y reportes de compras/pagos. El contrato de la API conserva sus campos para el frontend. Un cambio posterior en esos maestros se refleja tambien en compras anteriores. Esto reemplaza para Compras las referencias anteriores de este documento a nombres y documentos historicos; Ventas y Presupuestos mantienen su comportamiento actual.
+
+Cantidad, costo unitario, subtotal, total y unidad acordada siguen perteneciendo a la operacion. Conservar la unidad permite validar la recepcion y detectar un cambio de unidad posterior a la creacion de una orden pendiente.

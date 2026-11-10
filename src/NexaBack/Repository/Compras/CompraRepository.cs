@@ -15,30 +15,30 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
 {
     public async Task<ComprasPaginaDto> ListarAsync(int pagina, int tamanoPagina, string? buscar, string? estado, CancellationToken ct)
     {
-        var query = context.Compras.AsNoTracking();
+        var query = DatosCompra().AsNoTracking();
         if (estado is not null) query = query.Where(x => x.Estado == estado);
         if (!string.IsNullOrEmpty(buscar))
         {
             var patron = Patron(buscar);
-            query = query.Where(x => EF.Functions.ILike(x.ProveedorNombre, patron, "\\")
-                || EF.Functions.ILike(x.ProveedorDocumento ?? "", patron, "\\")
-                || EF.Functions.ILike(x.DepositoNombre, patron, "\\") || EF.Functions.ILike("OC-" + x.Id.ToString().PadLeft(6, '0'), patron, "\\"));
+            query = query.Where(x => EF.Functions.ILike(x.Proveedor.NombreRazonSocial, patron, "\\")
+                || EF.Functions.ILike(x.Proveedor.Documento ?? "", patron, "\\")
+                || EF.Functions.ILike(x.Deposito.Nombre, patron, "\\") || EF.Functions.ILike("OC-" + x.Id.ToString().PadLeft(6, '0'), patron, "\\"));
         }
         var total = await query.CountAsync(ct);
         var items = await query.OrderByDescending(x => x.Id).Skip((pagina - 1) * tamanoPagina).Take(tamanoPagina).ToListAsync(ct);
-        return new(items.Select(x => new CompraResumenDto(x.Id, Numero(x.Id), x.ProveedorNombre, x.ProveedorTipoDocumento, x.ProveedorDocumento,
-            x.DepositoNombre, x.Estado, x.Total, x.Version, x.CreadoEn)).ToArray(), total, pagina, tamanoPagina);
+        return new(items.Select(x => new CompraResumenDto(x.Id, Numero(x.Id), x.Proveedor.NombreRazonSocial, (x.Proveedor.TipoDocumento == null ? null : x.Proveedor.TipoDocumento.Nombre), x.Proveedor.Documento,
+            x.Deposito.Nombre, x.Estado, x.Total, x.Version, x.CreadoEn)).ToArray(), total, pagina, tamanoPagina);
     }
 
     public async Task<CompraDto> ObtenerAsync(int id, CancellationToken ct)
-        => Map(await context.Compras.AsNoTracking().Include(x => x.Detalles).SingleOrDefaultAsync(x => x.Id == id, ct)
+        => Map(await DatosCompra().AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new BusinessException("Compra no encontrada.", 404));
 
     public Task<CompraDto> CrearAsync(CrearCompraRequest request, string solicitudHash, CancellationToken ct)
         => TransaccionAsync(async () =>
         {
             var usuario = Usuario();
-            var anterior = await context.Compras.Include(x => x.Detalles).SingleOrDefaultAsync(x => x.OperacionId == request.OperacionId, ct);
+            var anterior = await DatosCompra().SingleOrDefaultAsync(x => x.OperacionId == request.OperacionId, ct);
             if (anterior is not null)
             {
                 if (anterior.SolicitudHash != solicitudHash || anterior.CreadoPor != usuario)
@@ -53,16 +53,15 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
             var productos = await context.Productos.Include(x => x.UnidadMedidaCatalogo).Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
             var compra = new Compra {
                 OperacionId = request.OperacionId, SolicitudHash = solicitudHash, ProveedorId = proveedor.Id,
-                ProveedorNombre = proveedor.NombreRazonSocial,
-                ProveedorTipoDocumento = proveedor.TipoDocumento == null ? null : proveedor.TipoDocumento.Nombre, ProveedorDocumento = proveedor.Documento, DepositoId = deposito.Id, DepositoNombre = deposito.Nombre,
+                Proveedor = proveedor, DepositoId = deposito.Id, Deposito = deposito,
                 Observaciones = request.Observaciones
             };
             foreach (var item in request.Items)
             {
                 if (!productos.TryGetValue(item.ProductoId, out var producto) || !producto.Activo) throw new BusinessException("Un producto no existe o está inactivo.");
                 var subtotal = CompraReglas.Subtotal(item.Cantidad, item.CostoUnitario, producto.UnidadMedidaCatalogo.Codigo);
-                compra.Detalles.Add(new CompraDetalle { ProductoId = producto.Id, ProductoCodigo = producto.Codigo,
-                    ProductoNombre = producto.Nombre, UnidadMedida = producto.UnidadMedidaCatalogo.Codigo,
+                compra.Detalles.Add(new CompraDetalle { ProductoId = producto.Id, Producto = producto,
+                    UnidadMedida = producto.UnidadMedidaCatalogo.Codigo,
                     Cantidad = item.Cantidad, CostoUnitario = item.CostoUnitario, Subtotal = subtotal });
                 compra.Total += subtotal;
             }
@@ -152,8 +151,14 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
     public async Task<IReadOnlyList<CompraDepositoDto>> DepositosAsync(CancellationToken ct)
         => await context.Depositos.AsNoTracking().Where(x => x.Activo).OrderBy(x => x.Nombre).Select(x => new CompraDepositoDto(x.Id, x.Nombre)).ToListAsync(ct);
 
+    // Cargar las relaciones tambien en reintentos, recepcion y cancelacion evita depender de datos duplicados.
+    private IQueryable<Compra> DatosCompra() => context.Compras
+        .Include(x => x.Proveedor).ThenInclude(x => x.TipoDocumento)
+        .Include(x => x.Deposito)
+        .Include(x => x.Detalles).ThenInclude(x => x.Producto);
+
     private int Usuario() => context.UsuarioAuditoriaId ?? throw new BusinessException("Se requiere una sesión válida.", 401);
-    private async Task<Compra> CargarAsync(int id, CancellationToken ct) => await context.Compras.Include(x => x.Detalles).SingleOrDefaultAsync(x => x.Id == id, ct)
+    private async Task<Compra> CargarAsync(int id, CancellationToken ct) => await DatosCompra().SingleOrDefaultAsync(x => x.Id == id, ct)
         ?? throw new BusinessException("Compra no encontrada.", 404);
     // Serializable y versiones protegen recepción/cancelación simultáneas y la primera existencia.
     private async Task<CompraDto> TransaccionAsync(Func<Task<CompraDto>> accion, CancellationToken ct)
@@ -175,8 +180,8 @@ public sealed class CompraRepository(UsuariosDbContext context) : ICompraReposit
     }
     private static string Numero(int id) => $"OC-{id:D6}";
     private static string Patron(string texto) => "%" + texto.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
-    private static CompraDto Map(Compra x) => new(x.Id, Numero(x.Id), x.ProveedorId, x.ProveedorNombre, x.ProveedorTipoDocumento, x.ProveedorDocumento,
-        x.DepositoId, x.DepositoNombre, x.Estado, x.Observaciones, x.Total, x.Version, x.RecibidoEn,
+    private static CompraDto Map(Compra x) => new(x.Id, Numero(x.Id), x.ProveedorId, x.Proveedor.NombreRazonSocial, (x.Proveedor.TipoDocumento == null ? null : x.Proveedor.TipoDocumento.Nombre), x.Proveedor.Documento,
+        x.DepositoId, x.Deposito.Nombre, x.Estado, x.Observaciones, x.Total, x.Version, x.RecibidoEn,
         x.CreadoEn, x.CreadoPor, x.ModificadoEn, x.ModificadoPor, x.Detalles.OrderBy(d => d.Id).Select(d => new CompraLineaDto(
-            d.Id, d.ProductoId, d.ProductoCodigo, d.ProductoNombre, d.UnidadMedida, d.Cantidad, d.CostoUnitario, d.Subtotal, d.MovimientoId)).ToArray());
+            d.Id, d.ProductoId, d.Producto.Codigo, d.Producto.Nombre, d.UnidadMedida, d.Cantidad, d.CostoUnitario, d.Subtotal, d.MovimientoId)).ToArray());
 }

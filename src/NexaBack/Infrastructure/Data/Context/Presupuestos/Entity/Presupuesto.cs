@@ -1,3 +1,6 @@
+using NexaBack.Infrastructure.Data.Context.Productos.Entity;
+using NexaBack.Infrastructure.Data.Context.Inventario.Entity;
+using NexaBack.Infrastructure.Data.Context.Comercial.Entity;
 using NexaBack.Infrastructure.Persistence;
 using NexaBack.Infrastructure.Data.Context.Ventas.Entity;
 namespace NexaBack.Infrastructure.Data.Context.Presupuestos.Entity;
@@ -11,11 +14,9 @@ public sealed class Presupuesto : IEntidadAuditable
     public Guid? EdicionOperacionId { get; set; }
     public string? EdicionHash { get; set; }
     public int ClienteId { get; set; }
-    public required string ClienteNombre { get; set; }
-    public string? ClienteTipoDocumento { get; set; }
-    public required string ClienteDocumento { get; set; }
+    public Cliente Cliente { get; set; } = null!;
     public int DepositoId { get; set; }
-    public required string DepositoNombre { get; set; }
+    public Deposito Deposito { get; set; } = null!;
     public string Estado { get; set; } = "Borrador";
     public DateOnly FechaVencimiento { get; set; }
     public string? Observaciones { get; set; }
@@ -41,8 +42,7 @@ public sealed class PresupuestoDetalle : IEntidadAuditable
     public int PresupuestoId { get; set; }
     public Presupuesto Presupuesto { get; set; } = null!;
     public int ProductoId { get; set; }
-    public required string ProductoCodigo { get; set; }
-    public required string ProductoNombre { get; set; }
+    public Producto Producto { get; set; } = null!;
     public required string UnidadMedida { get; set; }
     public decimal Cantidad { get; set; }
     public decimal PrecioUnitario { get; set; }

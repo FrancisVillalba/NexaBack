@@ -22,16 +22,12 @@ public sealed class CompraConfiguration : IEntityTypeConfiguration<Compra>
         b.HasIndex(x => x.OperacionId).IsUnique();
         b.HasIndex(x => new { x.Estado, x.CreadoEn });
         b.Property(x => x.SolicitudHash).HasMaxLength(64);
-        b.Property(x => x.ProveedorNombre).HasMaxLength(301);
-        b.Property(x => x.ProveedorTipoDocumento).HasMaxLength(100);
-        b.Property(x => x.ProveedorDocumento).HasMaxLength(50);
-        b.Property(x => x.DepositoNombre).HasMaxLength(100);
         b.Property(x => x.Estado).HasMaxLength(20);
         b.Property(x => x.Observaciones).HasMaxLength(500);
         b.Property(x => x.Total).HasPrecision(14, 2);
         b.Property(x => x.Version).IsConcurrencyToken();
-        b.HasOne<Proveedor>().WithMany().HasForeignKey(x => x.ProveedorId).OnDelete(DeleteBehavior.Restrict);
-        b.HasOne<Deposito>().WithMany().HasForeignKey(x => x.DepositoId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Proveedor).WithMany().HasForeignKey(x => x.ProveedorId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Deposito).WithMany().HasForeignKey(x => x.DepositoId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Detalles).WithOne(x => x.Compra).HasForeignKey(x => x.CompraId).OnDelete(DeleteBehavior.Restrict);
     }
 }
@@ -50,13 +46,11 @@ public sealed class CompraDetalleConfiguration : IEntityTypeConfiguration<Compra
         b.Property(x => x.Id).UseIdentityByDefaultColumn();
         b.HasIndex(x => new { x.CompraId, x.ProductoId }).IsUnique();
         b.HasIndex(x => x.MovimientoId).IsUnique();
-        b.Property(x => x.ProductoCodigo).HasMaxLength(50);
-        b.Property(x => x.ProductoNombre).HasMaxLength(150);
         b.Property(x => x.UnidadMedida).HasMaxLength(20);
         b.Property(x => x.Cantidad).HasPrecision(14, 3);
         b.Property(x => x.CostoUnitario).HasPrecision(14, 2);
         b.Property(x => x.Subtotal).HasPrecision(14, 2);
-        b.HasOne<Producto>().WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Producto).WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Movimiento).WithMany().HasForeignKey(x => x.MovimientoId).OnDelete(DeleteBehavior.Restrict);
     }
 }
